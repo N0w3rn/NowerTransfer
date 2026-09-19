@@ -141,6 +141,15 @@ class Settings:
 
     @property
     def relay(self) -> RelayEndpoint:
+        """The relay to actually connect to.
+
+        Public mode ignores any stored address. The settings screen keeps
+        one so switching back does not make the user retype it, and an
+        endpoint that quietly outranked the chosen mode would send files
+        somewhere other than where the user asked.
+        """
+        if self.mode is RelayMode.PUBLIC:
+            return RelayEndpoint("")
         return RelayEndpoint(self.relay_host, self.relay_password)
 
     @property

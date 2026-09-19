@@ -25,6 +25,12 @@ class SettingsView(View):
     def build(self) -> None:
         self.header(self.t("settings.title"), with_language=True)
 
+        #: Widgets that only mean something when the app uses a relay of
+        #: its own. Registered with :meth:`_needs_own_relay` and switched
+        #: as a group, so a new field is one call away from behaving
+        #: correctly instead of needing its own special case.
+        self._own_relay_only: list[ctk.CTkBaseClass] = []
+
         # Everything that must stay reachable is packed against the
         # bottom first. Packed last, a long translation or a small window
         # squeezes these to nothing instead of the cards above them.
@@ -55,6 +61,7 @@ class SettingsView(View):
             self._intro()
         self._mode_card()
         self._relay_card()
+        self._sync_relay_fields()
 
     # ------------------------------------------------------------------
     def _intro(self) -> None:
@@ -88,6 +95,7 @@ class SettingsView(View):
             unselected_color=COLORS.panel,
             unselected_hover_color=COLORS.panel_hover,
             text_color=COLORS.text,
+            command=self._sync_relay_fields,
         )
         current = RelayMode.parse(
             self._draft("draft_mode", self.window.settings.relay_mode)
@@ -107,6 +115,30 @@ class SettingsView(View):
         """What to show in a field: an unsaved edit if there is one."""
         value = self.options.get(key)
         return value if isinstance(value, str) else stored
+
+    def _needs_own_relay(self, widget: ctk.CTkBaseClass) -> ctk.CTkBaseClass:
+        """Mark a widget as meaningless without a relay of one's own."""
+        self._own_relay_only.append(widget)
+        return widget
+
+    def _sync_relay_fields(self, _selection: str | None = None) -> None:
+        """Grey out the relay fields when the public relay is chosen.
+
+        Their contents stay: switching back has to bring the address and
+        password back with it, rather than making the user retype them.
+        """
+        usable = self._selected_mode() is not RelayMode.PUBLIC
+        for widget in self._own_relay_only:
+            widget.configure(state="normal" if usable else "disabled")
+            if isinstance(widget, ctk.CTkEntry):
+                # CTkEntry has no text_color_disabled, so disabling it
+                # alone changes nothing on screen - a field that looks
+                # editable and silently ignores typing is worse than one
+                # that was never disabled. Dim it by hand.
+                widget.configure(
+                    text_color=COLORS.text if usable else COLORS.muted,
+                    fg_color=COLORS.background if usable else COLORS.panel_hover,
+                )
 
     def _selected_mode(self) -> RelayMode:
         chosen = self._mode.get()
@@ -132,6 +164,7 @@ class SettingsView(View):
         )
         self._host_entry.insert(0, self._draft("draft_host", settings.relay_host))
         self._host_entry.pack(fill="x", padx=PAD_CARD, pady=(4, 0))
+        self._needs_own_relay(self._host_entry)
         card.hint(
             f"{self.t('settings.relay_host_hint')}  ({self._source_text('relay_host')})"
         )
@@ -154,6 +187,7 @@ class SettingsView(View):
             0, self._draft("draft_password", settings.relay_password)
         )
         self._password_entry.pack(side="left", fill="x", expand=True)
+        self._needs_own_relay(self._password_entry)
 
         self._reveal = ctk.CTkCheckBox(
             row,
@@ -168,6 +202,7 @@ class SettingsView(View):
             command=self._toggle_password,
         )
         self._reveal.pack(side="left", padx=(10, 0))
+        self._needs_own_relay(self._reveal)
         password_card.hint(
             f"{self.t('settings.relay_password_hint')}  "
             f"({self._source_text('relay_password')})"

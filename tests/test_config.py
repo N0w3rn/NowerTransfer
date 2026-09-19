@@ -209,6 +209,26 @@ def test_the_public_relay_needs_no_address(layers):
     assert settings.is_configured is True
 
 
+def test_public_mode_ignores_a_stored_address(layers):
+    # The settings screen keeps the address so switching back is easy.
+    # It must not win over the mode the user actually chose.
+    write(layers["env"], "RELAY_HOST=mine:9009\nRELAY_PASSWORD=pw\n")
+    write(layers["user"], 'relay_mode = "public"\n')
+    settings = config.load_settings()
+
+    assert settings.relay_host == "mine:9009"  # still remembered
+    assert settings.relay.is_set is False  # but not used
+    assert settings.relay.host == ""
+
+
+def test_switching_back_from_public_restores_the_relay(layers):
+    write(layers["env"], "RELAY_HOST=mine:9009\nRELAY_PASSWORD=pw\n")
+    write(layers["user"], 'relay_mode = "own"\n')
+    settings = config.load_settings()
+    assert settings.relay.host == "mine:9009"
+    assert settings.relay.croc_password() == "pw"
+
+
 def test_own_mode_without_an_address_is_not_configured(layers):
     assert config.load_settings().is_configured is False
 
