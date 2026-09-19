@@ -10,7 +10,7 @@ description = "One-click desktop client for sending files through your own croc 
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-authors = [{ name = "N0w3rn" }]
+authors = [{ name = "Nowenr" }]
 keywords = ["croc", "file-transfer", "gui", "customtkinter", "self-hosted"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -34,9 +34,9 @@ dependencies = ["customtkinter>=6.0"]
 dev = ["pytest>=8.0", "ruff>=0.6", "pyinstaller>=6.6", "poethepoet>=0.27"]
 
 [project.urls]
-Homepage = "https://github.com/N0w3rn/NowerTransfer"
-Source = "https://github.com/N0w3rn/NowerTransfer"
-Issues = "https://github.com/N0w3rn/NowerTransfer/issues"
+Homepage = "https://github.com/Nowenr/NowerTransfer"
+Source = "https://github.com/Nowenr/NowerTransfer"
+Issues = "https://github.com/Nowenr/NowerTransfer/issues"
 
 [project.gui-scripts]
 nowertransfer = "nowertransfer.app:main"
