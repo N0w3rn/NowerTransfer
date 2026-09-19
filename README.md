@@ -137,6 +137,10 @@ source version is written — `pyproject.toml` reads that same line.
 - **The code phrase is the key.** croc derives the encryption key from it
   via PAKE, so it is generated with `secrets`, not `random`, and never
   appears in the process list — it reaches croc through the environment.
+  Five words from a 256-word list plus two digits is about **46 bits**,
+  and PAKE leaves nothing to grind offline: every guess costs a
+  connection to the relay. No two words in the list are one typo apart,
+  so a code that was read out loud cannot land on a different valid word.
 - **The relay password is a door lock, not a safe.** It keeps strangers
   from using your bandwidth. It does not protect file contents; those are
   encrypted before they ever reach the relay, which stores nothing.

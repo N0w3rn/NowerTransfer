@@ -119,8 +119,8 @@ CATALOG: dict[str, dict[str, str]] = {
         "de": "CODE-PHRASE — vom Absender",
     },
     "receive.code_placeholder": {
-        "en": "e.g. falke-wolke-tiger-nebel-83",
-        "de": "z. B. falke-wolke-tiger-nebel-83",
+        "en": "e.g. falke-wolke-tiger-nebel-quarz-83",
+        "de": "z. B. falke-wolke-tiger-nebel-quarz-83",
     },
     "receive.choose_target": {"en": "Choose folder", "de": "Zielordner wählen"},
     "receive.target_dialog": {
