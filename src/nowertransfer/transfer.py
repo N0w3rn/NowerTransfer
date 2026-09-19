@@ -11,7 +11,6 @@ import os
 import re
 import subprocess
 import threading
-import time
 from collections.abc import Iterator, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
@@ -25,10 +24,15 @@ from .config import RelayEndpoint
 #: How long to wait before reconnecting after croc exits unexpectedly.
 RETRY_DELAY_SECONDS = 15
 
-#: A run shorter than this that ends in a config error is not a dropped
-#: connection - it means the relay details are wrong.
-_FAST_FAIL_SECONDS = 5.0
-_FAST_FAIL_LIMIT = 4
+#: How many runs in a row may end in a relay error before giving up.
+#: More than one, so a momentary network blip does not look like a
+#: misconfiguration - but not many, because these errors do not heal.
+#:
+#: This used to also require the run to have been shorter than a few
+#: seconds. croc retries internally and takes ten, so that condition
+#: never held and the app reconnected forever without ever telling the
+#: user their relay was wrong.
+_RELAY_ERROR_LIMIT = 3
 
 #: croc messages that mean "your settings are wrong", as opposed to
 #: "the other side is not here yet", which is worth waiting out.
@@ -68,6 +72,8 @@ _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 
 class EventType(Enum):
     OUTPUT = "output"
     RETRY = "retry"
+    #: Switched from the configured relay to croc's public one.
+    FELL_BACK = "fell_back"
     FINISHED = "finished"
     CANCELLED = "cancelled"
     FAILED = "failed"
@@ -140,11 +146,13 @@ class TransferWorker:
         relay: RelayEndpoint,
         events: Queue[TransferEvent],
         retry_delay: int = RETRY_DELAY_SECONDS,
+        allow_public_fallback: bool = False,
     ) -> None:
         self._croc = croc
         self._relay = relay
         self._events = events
         self._retry_delay = retry_delay
+        self._allow_public_fallback = allow_public_fallback
         self._cancelled = threading.Event()
         self._process: subprocess.Popen[bytes] | None = None
         self._thread: threading.Thread | None = None
@@ -194,17 +202,25 @@ class TransferWorker:
         return self._thread is not None and self._thread.is_alive()
 
     # -- internals -----------------------------------------------------
-    def _environment(self, code: str) -> dict[str, str]:
+    def _environment(self, code: str, *, public: bool = False) -> dict[str, str]:
         """croc configuration passed out of band.
 
         Relay address, relay password and the code phrase all go through
         the environment rather than argv. The code phrase in particular is
         the end-to-end encryption secret, and argv is readable by every
         other process on the machine.
+
+        With ``public``, the relay variables are removed rather than set,
+        which is what makes croc use its own public relay. They are
+        removed explicitly: the surrounding environment may define them.
         """
         env = os.environ.copy()
-        env["CROC_RELAY"] = self._relay.host
-        env["CROC_PASS"] = self._relay.croc_password()
+        if public or not self._relay.is_set:
+            env.pop("CROC_RELAY", None)
+            env.pop("CROC_PASS", None)
+        else:
+            env["CROC_RELAY"] = self._relay.host
+            env["CROC_PASS"] = self._relay.croc_password()
         env["CROC_SECRET"] = code
         return env
 
@@ -212,7 +228,7 @@ class TransferWorker:
         self._cancelled.clear()
         self._thread = threading.Thread(
             target=self._run_until_done,
-            args=(command, self._environment(code), cwd),
+            args=(command, code, cwd),
             name="croc-transfer",
             daemon=True,
         )
@@ -227,12 +243,13 @@ class TransferWorker:
     ) -> None:
         self._events.put(TransferEvent(event_type, text, detail, seconds))
 
-    def _run_until_done(
-        self, command: list[str], env: dict[str, str], cwd: Path | None
-    ) -> None:
-        fast_failures = 0
+    def _run_until_done(self, command: list[str], code: str, cwd: Path | None) -> None:
+        relay_errors = 0
+        #: True once we have given up on the configured relay.
+        on_public = not self._relay.is_set
         while not self._cancelled.is_set():
-            exit_code, duration = self._run_once(command, env, cwd)
+            env = self._environment(code, public=on_public)
+            exit_code = self._run_once(command, env, cwd)
             if self._cancelled.is_set():
                 self._emit(EventType.CANCELLED)
                 return
@@ -251,14 +268,19 @@ class TransferWorker:
                 )
                 return
 
-            # A peer that is not there yet ("room not ready") is normal and
-            # worth waiting out. Only a run that dies immediately *and*
-            # complains about the relay counts as a misconfiguration.
-            if duration < _FAST_FAIL_SECONDS and looks_like_config_error(
-                self._last_line
-            ):
-                fast_failures += 1
-                if fast_failures >= _FAST_FAIL_LIMIT:
+            # A peer that is not there yet ("room not ready") is normal
+            # and worth waiting out. croc complaining about the relay
+            # itself is not, and does not get better by repeating.
+            if looks_like_config_error(self._last_line):
+                relay_errors += 1
+                if relay_errors >= _RELAY_ERROR_LIMIT:
+                    # The user's relay is not answering. Either switch to
+                    # the public one - if they asked for that - or stop.
+                    if self._allow_public_fallback and not on_public:
+                        on_public = True
+                        relay_errors = 0
+                        self._emit(EventType.FELL_BACK)
+                        continue
                     self._emit(
                         EventType.FAILED,
                         ERROR_RELAY_UNREACHABLE,
@@ -266,7 +288,7 @@ class TransferWorker:
                     )
                     return
             else:
-                fast_failures = 0
+                relay_errors = 0
 
             self._emit(EventType.RETRY, seconds=self._retry_delay)
             if self._cancelled.wait(self._retry_delay):
@@ -275,13 +297,12 @@ class TransferWorker:
 
     def _run_once(
         self, command: list[str], env: dict[str, str], cwd: Path | None
-    ) -> tuple[int | None, float]:
-        """Run croc once.
+    ) -> int | None:
+        """Run croc once, returning its exit code.
 
-        Returns ``(exit code, seconds)``, with ``None`` as the exit code if
-        the process could not be started at all.
+        ``None`` means the process could not be started at all, which has
+        already been reported as a failure.
         """
-        started = time.monotonic()
         try:
             self._process = subprocess.Popen(
                 command,
@@ -294,7 +315,7 @@ class TransferWorker:
             )
         except OSError as error:
             self._emit(EventType.FAILED, ERROR_CROC_START_FAILED, detail=str(error))
-            return None, 0.0
+            return None
 
         assert self._process.stdout is not None
         for line in iter_output_lines(self._process.stdout):
@@ -302,4 +323,4 @@ class TransferWorker:
                 continue
             self._last_line = line
             self._emit(EventType.OUTPUT, line)
-        return self._process.wait(), time.monotonic() - started
+        return self._process.wait()

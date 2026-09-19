@@ -5,6 +5,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from ... import __version__
+from ...config import RelayMode
 from ...session import load_send_session
 from ..theme import COLORS, RECEIVE_ACCENT, SEND_ACCENT, Accent, font
 from ..widgets import Card, link_button, primary_button
@@ -106,13 +107,15 @@ class HomeView(View):
         link_button(bar, self.t("nav.settings"), self.window.show_settings).pack(
             side="left"
         )
+        settings = self.window.settings
+        relay = (
+            self.t("relay.public")
+            if settings.mode is RelayMode.PUBLIC
+            else settings.relay.display_host()
+        )
         ctk.CTkLabel(
             bar,
-            text=self.t(
-                "app.footer",
-                version=__version__,
-                relay=self.window.settings.relay.display_host(),
-            ),
+            text=self.t("app.footer", version=__version__, relay=relay),
             font=font(10),
             text_color=COLORS.muted,
         ).pack(side="right", pady=6)

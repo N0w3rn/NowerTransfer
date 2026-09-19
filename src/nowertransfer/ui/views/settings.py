@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from ...config import save_settings, with_relay
+from ...config import RelayMode, save_settings, with_relay
 from ..theme import COLORS, NEUTRAL_ACCENT, PAD_CARD, RECEIVE_ACCENT, font
 from ..widgets import Card, primary_button
 from .base import View
@@ -43,14 +43,23 @@ class SettingsView(View):
             side="bottom", fill="x", pady=(8, 0)
         )
 
+        # The fields scroll. Three cards already exceed the minimum
+        # window height, and a screen whose layout depends on nothing
+        # ever being added to it is a screen that breaks next time.
+        self._body = ctk.CTkScrollableFrame(
+            self, fg_color="transparent", scrollbar_button_color=COLORS.panel_active
+        )
+        self._body.pack(fill="both", expand=True)
+
         if not self.window.settings.is_configured:
             self._intro()
+        self._mode_card()
         self._relay_card()
 
     # ------------------------------------------------------------------
     def _intro(self) -> None:
         ctk.CTkLabel(
-            self,
+            self._body,
             text=self.t("setup.body"),
             font=font(12),
             text_color=COLORS.muted,
@@ -59,10 +68,42 @@ class SettingsView(View):
             anchor="w",
         ).pack(fill="x", pady=(0, 10))
 
+    def _mode_card(self) -> None:
+        card = Card(self._body)
+        card.pack(fill="x")
+        card.caption(self.t("settings.relay_mode"))
+        row = card.row(pady=(4, 0))
+
+        self._mode_labels = {
+            mode: self.t(f"settings.relay_mode.{mode.value}") for mode in RelayMode
+        }
+        self._mode = ctk.CTkSegmentedButton(
+            row,
+            values=list(self._mode_labels.values()),
+            height=32,
+            font=font(12),
+            fg_color=COLORS.background,
+            selected_color=COLORS.panel_active,
+            selected_hover_color=COLORS.panel_active,
+            unselected_color=COLORS.panel,
+            unselected_hover_color=COLORS.panel_hover,
+            text_color=COLORS.text,
+        )
+        self._mode.set(self._mode_labels[self.window.settings.mode])
+        self._mode.pack(side="left", fill="x", expand=True)
+        card.hint(self.t("settings.relay_mode_hint"))
+
+    def _selected_mode(self) -> RelayMode:
+        chosen = self._mode.get()
+        for mode, label in self._mode_labels.items():
+            if label == chosen:
+                return mode
+        return RelayMode.OWN
+
     def _relay_card(self) -> None:
         settings = self.window.settings
 
-        card = Card(self)
+        card = Card(self._body)
         card.pack(fill="x")
         card.caption(self.t("settings.relay_host"))
         self._host_entry = ctk.CTkEntry(
@@ -80,7 +121,7 @@ class SettingsView(View):
             f"{self.t('settings.relay_host_hint')}  ({self._source_text('relay_host')})"
         )
 
-        password_card = Card(self)
+        password_card = Card(self._body)
         password_card.pack(fill="x", pady=12)
         password_card.caption(self.t("settings.relay_password"))
         row = password_card.row(pady=(4, 0))
@@ -124,14 +165,17 @@ class SettingsView(View):
 
     # ------------------------------------------------------------------
     def _save(self) -> None:
+        mode = self._selected_mode()
         host = self._host_entry.get().strip()
-        if not host:
+        # Only the public relay works without an address of your own.
+        if not host and mode is not RelayMode.PUBLIC:
             self._message.configure(
                 text=self.t("settings.invalid_host"), text_color=COLORS.error
             )
             return
 
         updated = with_relay(self.window.settings, host, self._password_entry.get())
+        updated.relay_mode = mode.value
         path = save_settings(updated)
 
         # Re-read from disk so the screen redraws with the real resolved

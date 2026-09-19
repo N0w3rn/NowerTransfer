@@ -51,6 +51,7 @@ ENV_FILE_NAME = ".env"
 
 ENV_RELAY_HOST = "NOWERTRANSFER_RELAY"
 ENV_RELAY_PASSWORD = "NOWERTRANSFER_RELAY_PASSWORD"
+ENV_RELAY_MODE = "NOWERTRANSFER_RELAY_MODE"
 ENV_LANGUAGE = "NOWERTRANSFER_LANGUAGE"
 
 #: ``.env`` keys and the setting each one fills. Deliberately short: this
@@ -59,12 +60,14 @@ ENV_LANGUAGE = "NOWERTRANSFER_LANGUAGE"
 ENV_FILE_KEYS = {
     "RELAY_HOST": "relay_host",
     "RELAY_PASSWORD": "relay_password",
+    "RELAY_MODE": "relay_mode",
 }
 
 #: Keys that may appear in a config file, mapped to their env var.
 _KEYS: dict[str, str | None] = {
     "relay_host": ENV_RELAY_HOST,
     "relay_password": ENV_RELAY_PASSWORD,
+    "relay_mode": ENV_RELAY_MODE,
     "language": ENV_LANGUAGE,
     "download_dir": None,
 }
@@ -78,6 +81,32 @@ class Source(Enum):
     PORTABLE = "portable"
     USER = "user"
     ENVIRONMENT = "environment"
+
+
+class RelayMode(Enum):
+    """Which relay a transfer is allowed to use.
+
+    The default keeps every byte on infrastructure the user runs. The
+    other two are opt-in, because croc's public relay is a third party:
+    file contents stay end-to-end encrypted either way, but who is
+    talking to whom, when, and how much stops being private.
+    """
+
+    #: Only the configured relay. Fail if it is unreachable.
+    OWN = "own"
+    #: Prefer the configured relay; switch to croc's public one if it
+    #: does not answer, and say so in the UI.
+    FALLBACK = "fallback"
+    #: Always use croc's public relay. No relay of your own needed.
+    PUBLIC = "public"
+
+    @classmethod
+    def parse(cls, value: str) -> RelayMode:
+        """Never raise on a hand-edited config; fall back to the safe mode."""
+        try:
+            return cls(value.strip().lower())
+        except ValueError:
+            return cls.OWN
 
 
 @dataclass(frozen=True)
@@ -105,6 +134,7 @@ class Settings:
 
     relay_host: str = ""
     relay_password: str = ""
+    relay_mode: str = RelayMode.OWN.value
     language: str = ""
     download_dir: str = ""
     sources: dict[str, Source] = field(default_factory=dict)
@@ -114,9 +144,21 @@ class Settings:
         return RelayEndpoint(self.relay_host, self.relay_password)
 
     @property
+    def mode(self) -> RelayMode:
+        return RelayMode.parse(self.relay_mode)
+
+    @property
     def is_configured(self) -> bool:
-        """False on first run of a build that had no relay baked in."""
-        return bool(self.relay_host)
+        """Whether the app has somewhere to send things.
+
+        False on first run of a build with no relay baked in - unless the
+        user chose the public relay, which needs no configuration.
+        """
+        return bool(self.relay_host) or self.mode is RelayMode.PUBLIC
+
+    @property
+    def allows_public_fallback(self) -> bool:
+        return self.mode is RelayMode.FALLBACK and bool(self.relay_host)
 
     def source_of(self, key: str) -> Source:
         return self.sources.get(key, Source.DEFAULT)

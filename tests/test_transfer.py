@@ -6,6 +6,7 @@ import pytest
 
 from nowertransfer.config import CROC_DEFAULT_RELAY_PASSWORD, RelayEndpoint
 from nowertransfer.transfer import (
+    EventType,
     TransferWorker,
     is_hidden_output,
     iter_output_lines,
@@ -175,6 +176,143 @@ def test_receive_writes_into_the_chosen_directory(monkeypatch, tmp_path):
     assert "--out" in captured["command"]
     assert captured["command"][captured["command"].index("--out") + 1] == str(tmp_path)
     assert captured["cwd"] == tmp_path
+
+
+# ----------------------------------------------------------------------
+#  The retry loop
+# ----------------------------------------------------------------------
+def drive(worker, events, exit_code=1, last_line="", runs=12):
+    """Run the retry loop with croc replaced by a canned result."""
+    seen_relays = []
+
+    def fake_run_once(_command, env, _cwd):
+        seen_relays.append(env.get("CROC_RELAY"))
+        worker._last_line = last_line
+        if len(seen_relays) >= runs:
+            worker.cancel()  # stop a loop that should have stopped itself
+        return exit_code
+
+    worker._run_once = fake_run_once
+    worker._run_until_done(["croc"], "code", None)
+    types = []
+    while not events.empty():
+        types.append(events.get_nowait().type)
+    return types, seen_relays
+
+
+UNREACHABLE = "relay connection failed: could not connect to r:9009"
+
+
+def test_an_unreachable_relay_is_reported_rather_than_retried_forever():
+    # Regression: this check also required the run to be shorter than a
+    # few seconds. croc retries internally and takes ten, so the app
+    # reconnected forever and never told the user the relay was wrong.
+    events = Queue()
+    worker = TransferWorker(
+        Path("croc"), RelayEndpoint("r:9009"), events, retry_delay=0
+    )
+    types, relays = drive(worker, events, last_line=UNREACHABLE)
+
+    assert EventType.FAILED in types
+    assert len(relays) == 3  # _RELAY_ERROR_LIMIT, not until cancelled
+
+
+def test_a_peer_that_has_not_arrived_yet_is_waited_out():
+    # "room not ready" only means the other side is not there yet.
+    events = Queue()
+    worker = TransferWorker(
+        Path("croc"), RelayEndpoint("r:9009"), events, retry_delay=0
+    )
+    types, _relays = drive(worker, events, last_line="room not ready", runs=8)
+
+    assert EventType.FAILED not in types
+    assert types.count(EventType.RETRY) >= 5
+
+
+def test_a_version_mismatch_gives_up_at_once():
+    events = Queue()
+    worker = TransferWorker(
+        Path("croc"), RelayEndpoint("r:9009"), events, retry_delay=0
+    )
+    types, relays = drive(
+        worker, events, last_line="peer uses unsupported PAKE protocol version 0"
+    )
+    assert types == [EventType.FAILED]
+    assert len(relays) == 1
+
+
+def test_fallback_moves_to_the_public_relay_and_announces_it():
+    events = Queue()
+    worker = TransferWorker(
+        Path("croc"),
+        RelayEndpoint("r:9009"),
+        events,
+        retry_delay=0,
+        allow_public_fallback=True,
+    )
+    types, relays = drive(worker, events, last_line=UNREACHABLE, runs=8)
+
+    assert EventType.FELL_BACK in types
+    # First the user's relay, then croc's own (no CROC_RELAY set).
+    assert relays[0] == "r:9009"
+    assert relays[-1] is None
+    # The switch must be visible, not silent.
+    assert types.index(EventType.FELL_BACK) < len(types)
+
+
+def test_without_fallback_the_transfer_never_leaves_the_configured_relay():
+    events = Queue()
+    worker = TransferWorker(
+        Path("croc"), RelayEndpoint("r:9009"), events, retry_delay=0
+    )
+    types, relays = drive(worker, events, last_line=UNREACHABLE)
+
+    assert EventType.FELL_BACK not in types
+    assert all(relay == "r:9009" for relay in relays)
+
+
+def test_a_successful_run_finishes_immediately():
+    events = Queue()
+    worker = TransferWorker(
+        Path("croc"), RelayEndpoint("r:9009"), events, retry_delay=0
+    )
+    types, relays = drive(worker, events, exit_code=0)
+    assert types == [EventType.FINISHED]
+    assert len(relays) == 1
+
+
+# ----------------------------------------------------------------------
+#  Public relay
+# ----------------------------------------------------------------------
+def test_the_public_relay_is_selected_by_unsetting_the_variables(monkeypatch):
+    # croc uses its own relay when CROC_RELAY is absent. They have to be
+    # removed rather than left alone: the surrounding environment may
+    # define them, which would silently point somewhere unintended.
+    monkeypatch.setenv("CROC_RELAY", "inherited.example.com:9009")
+    monkeypatch.setenv("CROC_PASS", "inherited")
+
+    worker = make_worker(RelayEndpoint("mine.example.com:9009", "mypass"))
+    public = worker._environment("code", public=True)
+    assert "CROC_RELAY" not in public
+    assert "CROC_PASS" not in public
+    assert public["CROC_SECRET"] == "code"
+
+    own = worker._environment("code")
+    assert own["CROC_RELAY"] == "mine.example.com:9009"
+
+
+def test_an_unset_relay_means_the_public_one(monkeypatch):
+    monkeypatch.setenv("CROC_RELAY", "inherited.example.com:9009")
+    env = make_worker(RelayEndpoint(""))._environment("code")
+    assert "CROC_RELAY" not in env
+
+
+def test_fallback_is_off_unless_asked_for():
+    assert make_worker(RelayEndpoint("r:9009"))._allow_public_fallback is False
+    worker = TransferWorker(
+        Path("croc"), RelayEndpoint("r:9009"), Queue(), allow_public_fallback=True
+    )
+    assert worker._allow_public_fallback is True
 
 
 def test_missing_relay_password_falls_back_to_crocs_default(monkeypatch):

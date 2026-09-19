@@ -153,6 +153,17 @@ CATALOG: dict[str, dict[str, str]] = {
         "de": "Fertig. Alles ist angekommen.",
     },
     "status.finished_button": {"en": "Done!", "de": "Fertig!"},
+    "status.fell_back": {
+        "en": (
+            "Your relay is not answering — continuing over croc's public "
+            "relay. Contents stay encrypted; who sends what to whom does not."
+        ),
+        "de": (
+            "Dein Relay antwortet nicht — es geht über das öffentliche "
+            "croc-Relay weiter. Inhalte bleiben verschlüsselt, wer wem was "
+            "schickt nicht."
+        ),
+    },
     "status.wrong_code": {
         "en": "Wrong code phrase — please check it.",
         "de": "Falsche Code-Phrase — bitte prüfen.",
@@ -215,6 +226,26 @@ CATALOG: dict[str, dict[str, str]] = {
         "de": "leer lassen für croc-Standard",
     },
     "settings.show_password": {"en": "Show", "de": "Zeigen"},
+    "settings.relay_mode": {"en": "Which relay to use", "de": "Welches Relay"},
+    "settings.relay_mode.own": {"en": "Only mine", "de": "Nur meins"},
+    "settings.relay_mode.fallback": {
+        "en": "Mine, then public",
+        "de": "Meins, sonst öffentlich",
+    },
+    "settings.relay_mode.public": {"en": "Public", "de": "Öffentlich"},
+    "settings.relay_mode_hint": {
+        "en": (
+            "croc's public relay is run by someone else. File contents stay "
+            "end-to-end encrypted either way, but it can see who transfers "
+            "to whom, when and how much."
+        ),
+        "de": (
+            "Das öffentliche croc-Relay betreibt jemand anderes. Die Inhalte "
+            "bleiben in jedem Fall Ende-zu-Ende verschlüsselt, aber wer wann "
+            "wie viel an wen überträgt, ist dort sichtbar."
+        ),
+    },
+    "relay.public": {"en": "croc public relay", "de": "öffentliches croc-Relay"},
     "settings.save": {"en": "Save", "de": "Speichern"},
     "settings.saved": {"en": "Saved to {path}", "de": "Gespeichert unter {path}"},
     "settings.invalid_host": {

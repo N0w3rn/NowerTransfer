@@ -62,6 +62,21 @@ At runtime the app resolves each value through four layers, later wins:
 The settings screen shows which layer each value came from. The last three
 live on the user's machine and never appear in this repository.
 
+### Which relay
+
+`RELAY_MODE`, also changeable in the settings screen:
+
+| Mode | Behaviour |
+|---|---|
+| `own` (default) | only your relay; fail if it is down |
+| `fallback` | prefer yours, switch to croc's public relay if it is down — and say so on screen |
+| `public` | always croc's public relay; no relay of your own needed |
+
+File contents are end-to-end encrypted in every mode. What changes is who
+gets to see *that* a transfer happened: anything but `own` puts that
+metadata in front of a relay somebody else runs, which is why the switch
+is never silent.
+
 ---
 
 ## Development

@@ -1,0 +1,81 @@
+name: croc update check
+
+# The croc version is pinned in scripts/fetch_croc.py so that every build
+# ships the same binary. This job removes the cost of that: instead of
+# remembering to check, you get an issue when there is something to bump.
+on:
+  schedule:
+    - cron: "0 7 * * 1" # Mondays
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - id: versions
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, re, urllib.request
+          from pathlib import Path
+
+          pinned = re.search(
+              r'DEFAULT_TAG = "([^"]+)"',
+              Path("scripts/fetch_croc.py").read_text(encoding="utf-8"),
+          ).group(1)
+          request = urllib.request.Request(
+              "https://api.github.com/repos/schollz/croc/releases/latest",
+              headers={"User-Agent": "NowerTransfer-update-check"},
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              latest = json.load(response)["tag_name"]
+
+          print(f"pinned={pinned}")
+          print(f"latest={latest}")
+          print(f"outdated={str(pinned != latest).lower()}")
+          PY
+
+      - if: steps.versions.outputs.outdated == 'true'
+        uses: actions/github-script@v7
+        env:
+          PINNED: ${{ steps.versions.outputs.pinned }}
+          LATEST: ${{ steps.versions.outputs.latest }}
+        with:
+          script: |
+            const { PINNED, LATEST } = process.env;
+            const title = `croc ${LATEST} is available (pinned: ${PINNED})`;
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'croc-update',
+            });
+            if (existing.data.some(issue => issue.title === title)) return;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo,
+              title,
+              labels: ['croc-update'],
+              body: [
+                `Pinned: \`${PINNED}\` — latest: \`${LATEST}\``,
+                '',
+                'To bump:',
+                '',
+                '1. `poe croc -- --tag latest --force`',
+                '2. Check `croc send --help` still has `--transport`, and that',
+                '   `--ignore-stdin`, `--yes`, `--overwrite`, `--out` and the',
+                '   `CROC_RELAY` / `CROC_PASS` / `CROC_SECRET` variables are intact.',
+                '3. Update `DEFAULT_TAG` in `scripts/fetch_croc.py`.',
+                '',
+                '**If the major version changed**, croc peers are likely',
+                'incompatible across it — croc 11 rejects croc 10 outright. Every',
+                'copy you handed out has to be replaced together.',
+              ].join('\n'),
+            });

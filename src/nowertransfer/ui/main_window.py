@@ -129,7 +129,12 @@ class MainWindow(ctk.CTk):
     def _start(self, launch: Callable[[TransferWorker], None]) -> bool:
         if self.croc_path is None or not self.settings.is_configured:
             return False
-        self._worker = TransferWorker(self.croc_path, self.settings.relay, self.events)
+        self._worker = TransferWorker(
+            self.croc_path,
+            self.settings.relay,
+            self.events,
+            allow_public_fallback=self.settings.allows_public_fallback,
+        )
         launch(self._worker)
         self._running = True
         return True

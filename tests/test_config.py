@@ -175,6 +175,60 @@ def test_relay_host_normalisation(typed, expected):
     assert config.normalise_relay_host(typed) == expected
 
 
+# ----------------------------------------------------------------------
+#  Relay mode
+# ----------------------------------------------------------------------
+def test_the_default_keeps_everything_on_your_own_relay(layers):
+    write(layers["env"], "RELAY_HOST=dev:9009\n")
+    settings = config.load_settings()
+    assert settings.mode is config.RelayMode.OWN
+    assert settings.allows_public_fallback is False
+
+
+@pytest.mark.parametrize(
+    ("stored", "expected"),
+    [
+        ("own", config.RelayMode.OWN),
+        ("fallback", config.RelayMode.FALLBACK),
+        ("public", config.RelayMode.PUBLIC),
+        ("  PUBLIC  ", config.RelayMode.PUBLIC),
+        # A hand-edited config must not crash the app, and must not
+        # silently end up on someone else's relay.
+        ("nonsense", config.RelayMode.OWN),
+        ("", config.RelayMode.OWN),
+    ],
+)
+def test_relay_mode_parsing(stored, expected):
+    assert config.RelayMode.parse(stored) is expected
+
+
+def test_the_public_relay_needs_no_address(layers):
+    write(layers["env"], "RELAY_MODE=public\n")
+    settings = config.load_settings()
+    assert settings.relay_host == ""
+    assert settings.is_configured is True
+
+
+def test_own_mode_without_an_address_is_not_configured(layers):
+    assert config.load_settings().is_configured is False
+
+
+def test_fallback_requires_an_address_to_fall_back_from(layers):
+    write(layers["env"], "RELAY_MODE=fallback\n")
+    assert config.load_settings().allows_public_fallback is False
+
+    write(layers["env"], "RELAY_MODE=fallback\nRELAY_HOST=dev:9009\n")
+    assert config.load_settings().allows_public_fallback is True
+
+
+def test_relay_mode_can_be_baked_in_and_overridden(layers, monkeypatch):
+    write(layers["env"], "RELAY_HOST=dev:9009\nRELAY_MODE=fallback\n")
+    assert config.load_settings().mode is config.RelayMode.FALLBACK
+
+    monkeypatch.setenv(config.ENV_RELAY_MODE, "own")
+    assert config.load_settings().mode is config.RelayMode.OWN
+
+
 def test_empty_relay_password_falls_back_to_crocs_default():
     endpoint = config.RelayEndpoint("relay.example.com:9009")
     assert endpoint.croc_password() == config.CROC_DEFAULT_RELAY_PASSWORD
