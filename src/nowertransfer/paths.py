@@ -8,7 +8,9 @@ temporary extraction directory that is *not* where the user put the .exe.
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
+from collections.abc import Iterable
 from contextlib import suppress
 from pathlib import Path
 
@@ -74,6 +76,42 @@ def default_download_dir() -> Path:
     """Where received files land unless the user picks somewhere else."""
     downloads = Path.home() / "Downloads"
     return downloads if downloads.is_dir() else Path.home()
+
+
+def total_size(paths: Iterable[Path]) -> int:
+    """Bytes in these files and folders. Unreadable entries count as 0."""
+    total = 0
+    for path in paths:
+        if path.is_dir():
+            for child in path.rglob("*"):
+                with suppress(OSError):
+                    if child.is_file():
+                        total += child.stat().st_size
+        else:
+            with suppress(OSError):
+                total += path.stat().st_size
+    return total
+
+
+def human_size(size: int) -> str:
+    value = float(size)
+    for unit in ("B", "kB", "MB", "GB", "TB"):
+        if value < 1024 or unit == "TB":
+            precision = 0 if unit == "B" or value >= 100 else 1
+            return f"{value:.{precision}f} {unit}"
+        value /= 1024
+    return f"{value:.1f} TB"
+
+
+def open_in_file_manager(path: Path) -> None:
+    """Show a folder in the system's file manager."""
+    with suppress(OSError):
+        if sys.platform == "win32":
+            os.startfile(path)
+        elif sys.platform == "darwin":
+            subprocess.run(["open", str(path)], check=False)
+        else:
+            subprocess.run(["xdg-open", str(path)], check=False)
 
 
 def write_atomic(path: Path, text: str, *, private: bool = False) -> None:

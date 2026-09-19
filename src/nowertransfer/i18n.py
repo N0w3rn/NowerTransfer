@@ -128,6 +128,7 @@ CATALOG: dict[str, dict[str, str]] = {
         "de": "Wohin sollen die Dateien?",
     },
     "receive.start": {"en": "Start receiving", "de": "Empfang starten"},
+    "receive.open_folder": {"en": "Open folder", "de": "Ordner öffnen"},
     "receive.need_code": {
         "en": "Enter the code phrase you were given.",
         "de": "Bitte die Code-Phrase vom Absender eingeben.",

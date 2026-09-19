@@ -2,16 +2,23 @@
 
 from __future__ import annotations
 
+import threading
+import tkinter
+from contextlib import suppress
 from pathlib import Path
 from tkinter import filedialog
 
 import customtkinter as ctk
 
 from ...codes import generate_code
+from ...paths import human_size, total_size
 from ...session import clear_send_session, save_send_session
 from ..theme import COLORS, PAD_CARD, SEND_ACCENT, font, mono
 from ..widgets import Card, link_button, quiet_button
 from .base import TransferScreen
+
+#: How often the main thread checks whether the size is known yet.
+_SIZE_POLL_MS = 80
 
 
 class SendView(TransferScreen):
@@ -22,6 +29,7 @@ class SendView(TransferScreen):
         self._selection_card()
         self._code_card()
         self.build_action_area(self.t("send.start"))
+        self._measure_selection()
 
     # ------------------------------------------------------------------
     def _selection_card(self) -> None:
@@ -82,16 +90,50 @@ class SendView(TransferScreen):
         )
 
     # ------------------------------------------------------------------
-    def _selection_text(self) -> str:
+    def _selection_text(self, size: str = "") -> str:
         paths = self.window.send_paths
         if not paths:
             return self.t("send.nothing_selected")
-        if len(paths) == 1:
-            return str(paths[0])
-        return self.t("send.many_selected", count=len(paths))
+        what = (
+            str(paths[0])
+            if len(paths) == 1
+            else self.t("send.many_selected", count=len(paths))
+        )
+        return f"{what}  ·  {size}" if size else what
 
     def _refresh_selection(self) -> None:
         self._selection_label.configure(text=self._selection_text())
+        self._measure_selection()
+
+    def _measure_selection(self) -> None:
+        """Add the total size once it is known.
+
+        Walked in the background, because a deep folder takes long
+        enough to freeze the window. The thread only fills a box; tk is
+        not thread-safe, so the main thread collects the result.
+        """
+        paths = list(self.window.send_paths)
+        if not paths:
+            return
+
+        measured: list[str] = []
+        threading.Thread(
+            target=lambda: measured.append(human_size(total_size(paths))),
+            name="measure-selection",
+            daemon=True,
+        ).start()
+        self._collect_size(paths, measured)
+
+    def _collect_size(self, paths: list[Path], measured: list[str]) -> None:
+        with suppress(tkinter.TclError):
+            if not self.winfo_exists():
+                return
+            if not measured:
+                self.after(_SIZE_POLL_MS, self._collect_size, paths, measured)
+                return
+            # The selection may have changed while we were counting.
+            if paths == self.window.send_paths:
+                self._selection_label.configure(text=self._selection_text(measured[0]))
 
     def _choose_folder(self) -> None:
         chosen = filedialog.askdirectory(title=self.t("send.folder_dialog"))

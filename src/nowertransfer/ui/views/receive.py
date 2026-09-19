@@ -8,8 +8,9 @@ from tkinter import filedialog
 import customtkinter as ctk
 
 from ...codes import is_plausible_code
+from ...paths import open_in_file_manager
 from ..theme import COLORS, PAD_CARD, RECEIVE_ACCENT, font, mono
-from ..widgets import Card, quiet_button
+from ..widgets import Card, link_button, quiet_button
 from .base import TransferScreen
 
 
@@ -61,6 +62,14 @@ class ReceiveView(TransferScreen):
         if chosen:
             self.window.set_download_dir(Path(chosen))
             self._target_label.configure(text=chosen)
+
+    def on_finished(self) -> None:
+        link_button(
+            self,
+            self.t("receive.open_folder"),
+            lambda: open_in_file_manager(self.window.receive_dir),
+            width=170,
+        ).pack(side="bottom", anchor="w")
 
     # ------------------------------------------------------------------
     def start_transfer(self) -> None:
