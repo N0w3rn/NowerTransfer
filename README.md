@@ -1,0 +1,129 @@
+# NowerTransfer
+
+Send a file to someone through **your own relay**. One window, two buttons.
+
+The person you send the app to does not install anything, does not sign up
+anywhere, and does not configure anything. They double-click the `.exe`,
+pick *Send* or *Receive*, and the file moves — end-to-end encrypted, over
+infrastructure you control.
+
+Under the hood it drives [croc](https://github.com/schollz/croc), which
+handles the encryption, the NAT traversal and the relay protocol.
+
+---
+
+## Setup
+
+**1. Run a croc relay** on any server. This is the only infrastructure
+needed — ports **9009–9013** have to be reachable:
+
+```yaml
+# docker-compose.yml on your server
+services:
+  croc-relay:
+    image: schollz/croc:latest
+    restart: unless-stopped
+    entrypoint: ["croc"]
+    command: ["--pass", "your-relay-password", "relay"]
+    ports:
+      - "9009-9013:9009-9013"
+```
+
+The password is optional; drop `--pass` and croc's default applies.
+
+**2. Point the app at it** and build:
+
+```bash
+cp .env.example .env        # RELAY_HOST and RELAY_PASSWORD go here
+poe build
+```
+
+**3. Hand out `dist/NowerTransfer.exe`.** That's it.
+
+The relay is baked into the binary, so recipients get a working app rather
+than a setup task.
+
+---
+
+## Configuration
+
+`.env` covers the normal case, and is the only file you touch. Build
+without one and the app asks the user on first start instead.
+
+At runtime the app resolves each value through four layers, later wins:
+
+| Layer | Where | Use for |
+|---|---|---|
+| build | `.env` from source, baked into the binary by `poe build` | the app you hand out |
+| portable | `nowertransfer.toml` next to the `.exe` | preconfiguring a copy without rebuilding |
+| user | in-app settings screen | the recipient changing it themselves |
+| environment | `NOWERTRANSFER_RELAY`, `NOWERTRANSFER_RELAY_PASSWORD` | CI and scripted runs |
+
+The settings screen shows which layer each value came from. The last three
+live on the user's machine and never appear in this repository.
+
+---
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+poe croc      # download the croc binary, checksum-verified
+poe app       # run from source
+poe test      # the test suite
+poe lint      # ruff check
+poe fmt       # ruff format
+poe check     # everything CI runs
+poe build     # build dist/NowerTransfer.exe
+```
+
+`poe` on its own lists the tasks. Dependencies are declared in
+`pyproject.toml`; there is no separate requirements file.
+
+---
+
+## How it works
+
+```
+ Sender                    your relay                   Receiver
+   │      croc, E2E encrypted   │   croc, E2E encrypted     │
+   ├───────────────────────────►│◄──────────────────────────┤
+   │        code phrase ─────────── out of band ────────────►│
+```
+
+- **The code phrase is the key.** croc derives the encryption key from it
+  via PAKE, so it is generated with `secrets`, not `random`, and never
+  appears in the process list — it reaches croc through the environment.
+- **The relay password is a door lock, not a safe.** It keeps strangers
+  from using your bandwidth. It does not protect file contents; those are
+  encrypted before they ever reach the relay, which stores nothing.
+- **Dropped connections retry automatically** until the transfer completes
+  or the user cancels. An unreachable relay is told apart from a peer who
+  simply has not shown up yet.
+
+## Layout
+
+```
+src/nowertransfer/
+  config.py     layered relay configuration
+  envfile.py    .env parsing
+  codes.py      code-phrase generation
+  croc.py       locating the croc binary
+  transfer.py   subprocess handling, retries, output parsing
+  i18n.py       German / English catalogue
+  ui/           theme, widgets, one module per screen
+scripts/
+  build.py      builds the executable, bakes in the relay
+  fetch_croc.py downloads croc from its GitHub releases
+```
+
+No secrets and no binaries are committed: `croc` is fetched at build time
+and verified against the SHA-256 its release publishes.
+
+Tagged releases are built **without** a relay on purpose — a published
+binary carrying relay credentials would hand every downloader the keys to
+that relay. Build locally to hand out a preconfigured copy.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

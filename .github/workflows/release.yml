@@ -1,0 +1,29 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+
+      # Deliberately built without a relay. A published binary that
+      # carried someone's relay credentials would hand every downloader
+      # the keys to that relay. The released app asks on first start;
+      # build locally with a .env to hand out a preconfigured copy.
+      - run: poe build
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/NowerTransfer.exe
+          generate_release_notes: true

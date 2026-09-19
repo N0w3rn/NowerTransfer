@@ -1,0 +1,164 @@
+import pytest
+
+from nowertransfer import config
+
+
+@pytest.fixture
+def layers(tmp_path, monkeypatch):
+    """Redirect every config layer into a temporary directory."""
+    paths = {
+        "env": tmp_path / ".env",
+        "baked": tmp_path / "relay.toml",
+        "portable": tmp_path / "nowertransfer.toml",
+        "user": tmp_path / "user" / "config.toml",
+    }
+    monkeypatch.setattr(config, "env_file_path", lambda: paths["env"])
+    monkeypatch.setattr(config, "baked_config_path", lambda: paths["baked"])
+    monkeypatch.setattr(config, "portable_config_path", lambda: paths["portable"])
+    monkeypatch.setattr(config, "user_config_path", lambda: paths["user"])
+    monkeypatch.setattr(config, "is_frozen", lambda: False)
+    for variable in (
+        config.ENV_RELAY_HOST,
+        config.ENV_RELAY_PASSWORD,
+        config.ENV_LANGUAGE,
+    ):
+        monkeypatch.delenv(variable, raising=False)
+    return paths
+
+
+def write(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+# ----------------------------------------------------------------------
+#  Layering
+# ----------------------------------------------------------------------
+def test_missing_layers_are_not_an_error(layers):
+    settings = config.load_settings()
+    assert settings.relay_host == ""
+    assert settings.is_configured is False
+    # A download directory is always available.
+    assert settings.download_dir
+
+
+def test_a_source_checkout_is_configured_by_its_env_file(layers):
+    write(layers["env"], "RELAY_HOST=dev.example.com:9009\nRELAY_PASSWORD=devpass\n")
+    settings = config.load_settings()
+    assert settings.relay_host == "dev.example.com:9009"
+    assert settings.relay_password == "devpass"
+    assert settings.source_of("relay_host") is config.Source.BUILD
+
+
+def test_a_build_is_configured_by_its_baked_file(layers, monkeypatch):
+    # The same layer, read from the file build.py put inside the binary.
+    monkeypatch.setattr(config, "is_frozen", lambda: True)
+    write(layers["env"], "RELAY_HOST=should-be-ignored:9009\n")
+    write(layers["baked"], 'relay_host = "baked:9009"\n')
+    settings = config.load_settings()
+    assert settings.relay_host == "baked:9009"
+    assert settings.source_of("relay_host") is config.Source.BUILD
+
+
+def test_env_file_only_exposes_its_documented_keys(layers):
+    write(layers["env"], "RELAY_HOST=dev:9009\nPATH=/nope\nNOWERTRANSFER_RELAY=x\n")
+    assert config.build_layer() == {"relay_host": "dev:9009"}
+
+
+def test_later_layers_win(layers, monkeypatch):
+    write(layers["env"], "RELAY_HOST=dev:9009\n")
+    write(layers["portable"], 'relay_host = "portable:9009"\n')
+    write(layers["user"], 'relay_host = "user:9009"\n')
+    assert config.load_settings().relay_host == "user:9009"
+
+    monkeypatch.setenv(config.ENV_RELAY_HOST, "env:9009")
+    settings = config.load_settings()
+    assert settings.relay_host == "env:9009"
+    assert settings.source_of("relay_host") is config.Source.ENVIRONMENT
+
+
+def test_layers_merge_per_key(layers):
+    write(layers["env"], "RELAY_HOST=dev:9009\nRELAY_PASSWORD=devpass\n")
+    write(layers["user"], 'language = "de"\n')
+    settings = config.load_settings()
+    assert settings.relay_host == "dev:9009"
+    assert settings.relay_password == "devpass"
+    assert settings.language == "de"
+
+
+def test_broken_config_file_is_ignored(layers):
+    write(layers["user"], "this is not = = toml")
+    write(layers["env"], "RELAY_HOST=dev:9009\n")
+    assert config.load_settings().relay_host == "dev:9009"
+
+
+def test_unknown_keys_are_dropped(layers):
+    write(layers["user"], 'relay_host = "user:9009"\nsomething_else = "x"\n')
+    assert config.read_config_file(layers["user"]) == {"relay_host": "user:9009"}
+
+
+# ----------------------------------------------------------------------
+#  Saving
+# ----------------------------------------------------------------------
+def test_saving_does_not_copy_a_baked_secret_into_plaintext(layers):
+    write(layers["env"], "RELAY_HOST=dev:9009\nRELAY_PASSWORD=secret\n")
+    settings = config.load_settings()
+    settings.language = "de"
+
+    config.save_settings(settings)
+
+    stored = config.read_config_file(layers["user"])
+    assert "relay_password" not in stored
+    assert "relay_host" not in stored
+    assert stored["language"] == "de"
+
+
+def test_saving_persists_changed_values(layers):
+    write(layers["env"], "RELAY_HOST=dev:9009\n")
+    settings = config.with_relay(config.load_settings(), "other.example.com", "pw")
+    config.save_settings(settings)
+
+    reloaded = config.load_settings()
+    assert reloaded.relay_host == "other.example.com:9009"
+    assert reloaded.relay_password == "pw"
+    assert reloaded.source_of("relay_host") is config.Source.USER
+
+
+def test_saved_file_round_trips_awkward_characters(layers, tmp_path):
+    settings = config.with_relay(
+        config.load_settings(), "relay.example.com", 'a"b\\c\td'
+    )
+    config.save_settings(settings)
+    assert config.load_settings().relay_password == 'a"b\\c\td'
+
+
+# ----------------------------------------------------------------------
+#  Relay endpoint
+# ----------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("typed", "expected"),
+    [
+        ("relay.example.com", "relay.example.com:9009"),
+        ("relay.example.com:9100", "relay.example.com:9100"),
+        ("  relay.example.com  ", "relay.example.com:9009"),
+        ("https://relay.example.com/", "relay.example.com:9009"),
+        ("tcp://10.0.0.5", "10.0.0.5:9009"),
+        ("10.0.0.5:9009", "10.0.0.5:9009"),
+        ("::1", "[::1]:9009"),
+        ("[::1]:9009", "[::1]:9009"),
+        ("[::1]", "[::1]:9009"),
+        ("", ""),
+    ],
+)
+def test_relay_host_normalisation(typed, expected):
+    assert config.normalise_relay_host(typed) == expected
+
+
+def test_empty_relay_password_falls_back_to_crocs_default():
+    endpoint = config.RelayEndpoint("relay.example.com:9009")
+    assert endpoint.croc_password() == config.CROC_DEFAULT_RELAY_PASSWORD
+
+
+def test_relay_password_is_used_when_set():
+    endpoint = config.RelayEndpoint("relay.example.com:9009", "hunter2")
+    assert endpoint.croc_password() == "hunter2"
