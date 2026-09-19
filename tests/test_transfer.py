@@ -68,9 +68,8 @@ def test_version_mismatch_detection(line, expected):
 
 
 def test_the_public_web_receive_url_is_kept_out_of_the_ui():
-    # croc prints https://getcroc.com/?code=<the code phrase>. That query
-    # string is the end-to-end encryption key; showing it invites pasting
-    # it into a third party's site.
+    # That query string is the encryption key; showing it invites
+    # pasting it into a third party's site.
     assert is_hidden_output("https://getcroc.com/?code=falke-wolke-tiger-83")
     assert is_hidden_output("Or open: https://getcroc.com/?code=x")
     assert not is_hidden_output("Sending 'photo.jpg' (2.1 MB)")
@@ -204,9 +203,8 @@ UNREACHABLE = "relay connection failed: could not connect to r:9009"
 
 
 def test_an_unreachable_relay_is_reported_rather_than_retried_forever():
-    # Regression: this check also required the run to be shorter than a
-    # few seconds. croc retries internally and takes ten, so the app
-    # reconnected forever and never told the user the relay was wrong.
+    # Regression: this also required the run to be under five seconds.
+    # croc retries internally and takes ten, so it never fired.
     events = Queue()
     worker = TransferWorker(
         Path("croc"), RelayEndpoint("r:9009"), events, retry_delay=0
@@ -285,9 +283,8 @@ def test_a_successful_run_finishes_immediately():
 #  Public relay
 # ----------------------------------------------------------------------
 def test_the_public_relay_is_selected_by_unsetting_the_variables(monkeypatch):
-    # croc uses its own relay when CROC_RELAY is absent. They have to be
-    # removed rather than left alone: the surrounding environment may
-    # define them, which would silently point somewhere unintended.
+    # croc uses its own relay when CROC_RELAY is absent - removed, not
+    # left alone, since the surrounding environment may define it.
     monkeypatch.setenv("CROC_RELAY", "inherited.example.com:9009")
     monkeypatch.setenv("CROC_PASS", "inherited")
 

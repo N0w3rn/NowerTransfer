@@ -29,8 +29,7 @@ def test_an_empty_stamp_counts_as_unstamped(tmp_path, monkeypatch):
 
 
 def test_the_packaging_metadata_reads_the_same_line():
-    # pyproject.toml takes its version from VERSION with this pattern, so
-    # the two cannot drift apart. Guard the line it matches on.
+    # pyproject.toml matches on this exact line; guard it.
     source = Path(nowertransfer.__file__).read_text(encoding="utf-8")
     match = re.search(r'^VERSION = "(?P<version>[^"]+)"', source, re.MULTILINE)
     assert match and match.group("version") == nowertransfer.VERSION

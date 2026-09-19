@@ -21,21 +21,13 @@ from typing import IO
 
 from .config import RelayEndpoint
 
-#: How long to wait before reconnecting after croc exits unexpectedly.
 RETRY_DELAY_SECONDS = 15
 
-#: How many runs in a row may end in a relay error before giving up.
-#: More than one, so a momentary network blip does not look like a
-#: misconfiguration - but not many, because these errors do not heal.
-#:
-#: This used to also require the run to have been shorter than a few
-#: seconds. croc retries internally and takes ten, so that condition
-#: never held and the app reconnected forever without ever telling the
-#: user their relay was wrong.
+#: Consecutive relay errors before giving up. More than one so a blip
+#: does not look like a misconfiguration, few because these do not heal.
 _RELAY_ERROR_LIMIT = 3
 
-#: croc messages that mean "your settings are wrong", as opposed to
-#: "the other side is not here yet", which is worth waiting out.
+#: "Your settings are wrong", as opposed to "the peer is not here yet".
 _CONFIG_ERROR_MARKERS = (
     "could not connect",
     "bad password",
@@ -46,26 +38,20 @@ _CONFIG_ERROR_MARKERS = (
 _PROGRESS_PATTERN = re.compile(r"(\d{1,3})%")
 _LINE_SEPARATORS = re.compile(rb"[\r\n]")
 
-#: Translation keys a FAILED event can carry.
 ERROR_RELAY_UNREACHABLE = "error.relay_unreachable"
 ERROR_CROC_START_FAILED = "error.croc_start_failed"
 ERROR_VERSION_MISMATCH = "error.version_mismatch"
 
-#: croc 11 changed its PAKE protocol and refuses croc 10 peers outright.
-#: Retrying cannot fix that, so say so instead of reconnecting forever.
+#: croc 11 changed its PAKE protocol and rejects croc 10 peers outright.
 _VERSION_MISMATCH_MARKERS = (
     "unsupported pake protocol version",
     "upgrade both croc",
 )
 
-#: croc prints a link to its public web-receive service that has the code
-#: phrase in the query string. That phrase is the end-to-end encryption
-#: key, and this app exists to keep transfers on the user's own relay, so
-#: the line is kept out of the log rather than inviting someone to paste
-#: the key into a third party's website.
+#: croc prints a getcroc.com link with the code phrase in the query
+#: string. That phrase is the encryption key, so it stays out of the log.
 _HIDDEN_OUTPUT = ("getcroc.com",)
 
-#: Hide the console window croc would otherwise flash up on Windows.
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
 
@@ -98,7 +84,7 @@ def parse_progress(line: str) -> float | None:
 
 
 def is_hidden_output(line: str) -> bool:
-    """True for croc output that must not reach the UI. See ``_HIDDEN_OUTPUT``."""
+    """True for croc output that must not reach the UI."""
     return any(marker in line for marker in _HIDDEN_OUTPUT)
 
 
@@ -160,14 +146,10 @@ class TransferWorker:
 
     # -- public API ----------------------------------------------------
     def start_send(self, paths: Sequence[str | Path], code: str) -> None:
-        # --ignore-stdin is mandatory: a windowed build has no real stdin,
-        # and croc would otherwise treat that broken handle as piped input
-        # and send an empty stream instead of the selected files.
-        #
-        # --transport relay pins the data path to the configured relay.
-        # croc's default, "auto", may also route through the public DERP
-        # network, which would quietly defeat the point of this app.
-        # (Requires croc 11+, which is what scripts/fetch_croc.py pins.)
+        # --ignore-stdin: a windowed build's stdin is a broken handle that
+        # croc would treat as piped input, sending that instead of the files.
+        # --transport relay: croc's "auto" may route via the public DERP
+        # network. Needs croc 11+, which fetch_croc.py pins.
         command = [
             str(self._croc),
             "--ignore-stdin",
@@ -180,8 +162,7 @@ class TransferWorker:
 
     def start_receive(self, code: str, target_dir: str | Path) -> None:
         target = Path(target_dir)
-        # --out picks the destination; cwd matches it so croc's partial
-        # files are written there too rather than beside the .exe.
+        # cwd matches --out so partial files land there too, not beside the .exe.
         command = [
             str(self._croc),
             "--yes",
@@ -203,16 +184,14 @@ class TransferWorker:
 
     # -- internals -----------------------------------------------------
     def _environment(self, code: str, *, public: bool = False) -> dict[str, str]:
-        """croc configuration passed out of band.
+        """croc configuration, passed out of band.
 
-        Relay address, relay password and the code phrase all go through
-        the environment rather than argv. The code phrase in particular is
-        the end-to-end encryption secret, and argv is readable by every
-        other process on the machine.
+        argv is readable by every other process on the machine, and the
+        code phrase is the encryption secret, so it goes through the
+        environment along with the relay details.
 
-        With ``public``, the relay variables are removed rather than set,
-        which is what makes croc use its own public relay. They are
-        removed explicitly: the surrounding environment may define them.
+        ``public`` *removes* the relay variables rather than leaving them
+        alone - the surrounding environment may define them.
         """
         env = os.environ.copy()
         if public or not self._relay.is_set:
@@ -245,7 +224,6 @@ class TransferWorker:
 
     def _run_until_done(self, command: list[str], code: str, cwd: Path | None) -> None:
         relay_errors = 0
-        #: True once we have given up on the configured relay.
         on_public = not self._relay.is_set
         while not self._cancelled.is_set():
             env = self._environment(code, public=on_public)
@@ -268,14 +246,11 @@ class TransferWorker:
                 )
                 return
 
-            # A peer that is not there yet ("room not ready") is normal
-            # and worth waiting out. croc complaining about the relay
-            # itself is not, and does not get better by repeating.
+            # A peer that has not arrived yet is worth waiting out; croc
+            # complaining about the relay itself is not.
             if looks_like_config_error(self._last_line):
                 relay_errors += 1
                 if relay_errors >= _RELAY_ERROR_LIMIT:
-                    # The user's relay is not answering. Either switch to
-                    # the public one - if they asked for that - or stop.
                     if self._allow_public_fallback and not on_public:
                         on_public = True
                         relay_errors = 0

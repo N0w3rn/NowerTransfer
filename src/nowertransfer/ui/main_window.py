@@ -188,8 +188,8 @@ class MainWindow(ctk.CTk):
         self.destroy()
 
     def destroy(self) -> None:
-        # Stop polling before the widgets go away: a callback that fires
-        # after the window is gone raises out of tkinter's event loop.
+        # A callback firing after the widgets are gone raises out of
+        # tkinter's event loop, where nothing catches it.
         if self._poll_job is not None:
             self.after_cancel(self._poll_job)
             self._poll_job = None

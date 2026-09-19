@@ -49,8 +49,7 @@ def test_ciphertext_differs_between_calls():
 def test_tampered_ciphertext_does_not_decrypt():
     stored = secretstore.protect(SECRET)
     blob = bytearray(base64.b64decode(stored[len(secretstore.PREFIX_DPAPI) :]))
-    # A DPAPI blob starts with a header (version, provider GUID, salt)
-    # that is not part of what is authenticated. Flip a byte in the
+    # The blob's header is not authenticated, so flip a byte in the
     # encrypted payload near the end instead.
     blob[-8] ^= 0xFF
     tampered = secretstore.PREFIX_DPAPI + base64.b64encode(blob).decode("ascii")

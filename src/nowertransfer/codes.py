@@ -1,15 +1,11 @@
 """Generation of the code phrase that pairs sender and receiver.
 
-The code phrase is not a convenience label - croc derives the end-to-end
-encryption key from it via PAKE. It therefore has to be unguessable, which
-rules out :mod:`random` (a Mersenne Twister whose state can be reconstructed
-from earlier outputs) in favour of :mod:`secrets`.
+croc derives the end-to-end encryption key from this phrase via PAKE, so
+it has to be unguessable - hence :mod:`secrets` and not :mod:`random`,
+whose state can be reconstructed from earlier outputs.
 
-Five words drawn without replacement from a 256 word list plus two digits
-give 256*255*254*253*252*100 combinations, about 46.6 bits. Guessing is
-online-only - croc's PAKE gives an attacker nothing to grind offline, and
-every attempt costs a connection to the relay - so this is far past what
-is reachable, while still being something you can read out over the phone.
+Five of 256 words plus two digits is about 46.6 bits, and PAKE leaves
+nothing to grind offline: every guess costs a connection to the relay.
 """
 
 from __future__ import annotations
@@ -17,10 +13,9 @@ from __future__ import annotations
 import math
 import secrets
 
-#: Short, lowercase, ASCII-only words. No umlauts, so they type the same
-#: on any keyboard, and no two words within one edit of each other, so a
-#: dictated code cannot land on a different valid word. The word list
-#: test enforces both; it is what caught "stein"/"stern", "turm"/"sturm"
+#: ASCII only, so they type the same on any keyboard, and no two within
+#: one edit of each other, so a dictated code cannot land on a different
+#: valid word. Both enforced by the tests, which caught "stein"/"stern"
 #: and "boden"/"bogen" in the first version of this list.
 WORDS: tuple[str, ...] = (
     "abend", "adler", "ahorn", "amboss", "ananas", "anker", "apfel", "arena",
@@ -61,8 +56,7 @@ WORDS: tuple[str, ...] = (
 WORD_COUNT = 5
 DIGIT_COUNT = 2
 
-#: Shortest input the receive screen accepts. croc's own default codes are
-#: three short words, so anything below this is a typo rather than a code.
+#: Shortest input the receive screen accepts; below this it is a typo.
 MIN_CODE_LENGTH = 6
 
 _random = secrets.SystemRandom()

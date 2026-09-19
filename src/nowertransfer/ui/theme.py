@@ -1,12 +1,8 @@
 """Colours, fonts and spacing.
 
-The palette is the logo's: gold on a near-black indigo. Both key colours
-are sampled from the mark itself rather than approximated, so the app and
-the icon in the taskbar look like the same product.
-
-Gold is the only accent. An earlier version used green for sending and
-blue for receiving, which a two-colour brand has no room for, so the two
-directions are told apart by the arrow on their cards instead.
+Gold on near-black indigo, both sampled from the logo. Gold is the only
+accent, so send and receive are told apart by the arrow on their cards
+rather than by colour.
 """
 
 from __future__ import annotations
@@ -17,8 +13,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Palette:
-    # Sampled from the logo: #07021A is its darkest body colour, #F8C715
-    # its gold. The rest of the scale is built up from those two.
+    # #07021A and #F8C715 are the logo's; the rest is built from them.
     background: str = "#0A0518"
     panel: str = "#150F2B"
     panel_hover: str = "#201938"
@@ -49,7 +44,6 @@ class Accent:
 GOLD_ACCENT = Accent(COLORS.gold, COLORS.gold_hover, COLORS.ink)
 NEUTRAL_ACCENT = Accent(COLORS.muted, COLORS.panel_hover, COLORS.text)
 
-#: Both directions share the brand accent; see the module docstring.
 SEND_ACCENT = GOLD_ACCENT
 RECEIVE_ACCENT = GOLD_ACCENT
 

@@ -41,8 +41,8 @@ class HomeView(View):
         row.grid_columnconfigure((0, 1), weight=1, uniform="roles")
         row.grid_rowconfigure(0, weight=1)
 
-        # The arrow carries the direction. The palette is one accent, so
-        # it cannot do that job the way two colours used to.
+        # The arrow carries the direction; with one accent the colour
+        # cannot.
         roles: list[tuple[str, str, str, object]] = [
             ("▲", "home.send.title", "home.send.body", self.window.show_send),
             ("▼", "home.receive.title", "home.receive.body", self.window.show_receive),

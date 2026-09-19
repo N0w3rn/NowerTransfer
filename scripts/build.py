@@ -196,8 +196,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    # Resolved first: no point downloading croc for a build that is
-    # going to be rejected for having no version.
+    # First: no point downloading croc for a build that gets rejected.
     version = resolve_app_version(args.version)
 
     if shutil.which("pyinstaller") is None:

@@ -18,19 +18,14 @@ jobs:
       - run: uv sync --locked
       - run: choco install innosetup --no-progress --yes
 
-      # Builds the executable and wraps it in the installer, both
-      # through uv so they contain the locked library versions.
+      # Executable and installer, through uv so both carry the locked
+      # versions. No version argument - it comes from the tag.
       #
       # Deliberately without a relay: a published binary carrying relay
-      # credentials would hand every downloader the keys to that relay.
-      # The released app asks on first start; build locally with a .env
-      # to hand out a preconfigured copy.
-      #
-      # No version argument - the workflow takes it from the tag.
+      # credentials hands every downloader the keys to it. Build locally
+      # with a .env to give out a preconfigured copy.
       - run: uv run poe installer
 
-      # Both are published: the installer for people who want it in
-      # their start menu, the bare .exe for a portable copy.
       - uses: softprops/action-gh-release@v2
         with:
           files: |

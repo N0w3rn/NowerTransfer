@@ -1,21 +1,15 @@
-; Inno Setup script for the NowerTransfer installer.
-;
-; Not built by hand - scripts/make_installer.py passes the values below
-; and runs ISCC. See `poe installer --help`.
-;
-; Required on the command line:
+; Built by scripts/make_installer.py, which passes:
 ;   /DAppVersion=1.0.0        what the app calls itself
-;   /DNumericVersion=1.0.0.0  file-metadata version, four numbers
+;   /DNumericVersion=1.0.0.0  file metadata, four numbers
 ;   /DSourceExe=...           the built NowerTransfer.exe
-;   /DOutputDir=...           where the setup should end up
+;   /DOutputDir=...           where the setup goes
 
 #define AppName "NowerTransfer"
 #define Publisher "Nowenr"
 #define HomePage "https://github.com/Nowenr/NowerTransfer"
 
 [Setup]
-; Fixed, so an upgrade replaces the previous install instead of adding
-; a second entry to the installed-programs list. Never change it.
+; Never change: an upgrade replaces the previous install by matching it.
 AppId={{D67C5ECC-97A8-467C-98A5-ED21D35BB391}
 AppName={#AppName}
 AppVersion={#AppVersion}
@@ -25,10 +19,8 @@ AppPublisherURL={#HomePage}
 AppSupportURL={#HomePage}/issues
 AppUpdatesURL={#HomePage}/releases
 
-; Installs for the current user only, which means no admin prompt. The
-; app writes nothing outside the user's own profile, so nothing here
-; needs elevation - and one fewer scary dialog matters for something
-; handed to people who just want to receive a file.
+; Current user only, so no admin prompt. The app writes nothing outside
+; the user's profile, so nothing here needs elevation.
 PrivilegesRequired=lowest
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
@@ -49,7 +41,6 @@ Compression=lzma2/max
 SolidCompression=yes
 
 [Languages]
-; The app itself is bilingual; the installer should not be less.
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
@@ -71,6 +62,5 @@ Filename: "{app}\NowerTransfer.exe"; \
     Description: "{cm:LaunchProgram,{#AppName}}"; \
     Flags: nowait postinstall skipifsilent
 
-; Settings and the resume file live in %APPDATA%\NowerTransfer and are
-; deliberately left behind on uninstall: reinstalling should not mean
-; typing the relay in again. They are a few hundred bytes.
+; %APPDATA%\NowerTransfer is left behind on uninstall on purpose:
+; reinstalling should not mean typing the relay in again.

@@ -37,8 +37,7 @@ def save_send_session(code: str, paths: list[str]) -> None:
         "code": protect(code),
         "paths": [str(p) for p in paths],
     }
-    # Resume is a convenience; failing to record it must not break a
-    # transfer that is about to start.
+    # Failing to record a resume point must not break the transfer.
     with suppress(OSError):
         write_atomic(session_path(), json.dumps(payload, indent=2), private=True)
 
@@ -61,8 +60,8 @@ def load_send_session() -> SendSession | None:
     if not isinstance(stored_code, str) or not isinstance(paths, list):
         return None
 
-    # An undecryptable code means the file came from another machine or
-    # account. There is nothing to resume, so offer nothing.
+    # A code that will not decrypt came from another machine; nothing
+    # to resume.
     code = unprotect(stored_code)
     existing = [p for p in paths if isinstance(p, str) and Path(p).exists()]
     if not code or not existing:

@@ -58,8 +58,7 @@ def test_a_release_tag_fills_it_in(monkeypatch):
 
 
 def test_a_branch_name_is_not_a_version(monkeypatch):
-    # A push to main also sets GITHUB_REF_NAME; it must not be mistaken
-    # for a tag and stamped into a binary.
+    # A push to main sets GITHUB_REF_NAME too.
     monkeypatch.setenv("GITHUB_REF_NAME", "main")
     with pytest.raises(SystemExit):
         build.resolve_app_version(None)

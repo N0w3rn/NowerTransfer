@@ -59,9 +59,8 @@ class SendView(TransferScreen):
         card.pack(fill="x", pady=12)
         card.caption(self.t("send.code_label"))
 
-        # The code gets a line of its own and wraps. Five words from the
-        # list can run to about 45 characters, which no single row shared
-        # with the buttons would hold.
+        # Its own line, wrapped: five words run to some 45 characters,
+        # which will not share a row with the buttons.
         self._code_label = ctk.CTkLabel(
             card,
             text=self.window.send_code,

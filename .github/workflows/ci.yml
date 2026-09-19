@@ -8,10 +8,8 @@ on:
 permissions:
   contents: read
 
-# `uv sync --locked` installs exactly what uv.lock says and fails if
-# pyproject.toml has changed without the lock being refreshed. That is
-# what stops the lockfile from quietly going stale, and it means CI runs
-# against the same versions a developer does.
+# `uv sync --locked` fails if pyproject.toml changed without the lock
+# being refreshed, so CI runs the same versions a developer does.
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -41,9 +39,8 @@ jobs:
       # The widget tests have a job of their own, where a display exists.
       - run: uv run pytest --ignore=tests/test_ui_layout.py
 
-  # The widget tests need a display. Both runners are tried on purpose:
-  # Linux under xvfb is the reliable path, Windows matches the platform
-  # the app actually ships on and has the font metrics that go with it.
+  # Both runners on purpose: Linux under xvfb, and Windows for the font
+  # metrics the app actually ships against.
   ui:
     strategy:
       fail-fast: false
@@ -51,14 +48,12 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     env:
-      # Turns "no display, skipping" into a failure. Without this the
-      # job would pass by running nothing at all.
+      # Without this the job would pass by running nothing at all.
       NOWERTRANSFER_UI_TESTS: required
     steps:
       - uses: actions/checkout@v5
-      # This job borrows its interpreter from setup-python. uv's own
-      # CPython builds ship without tkinter on Linux, so `uv sync` alone
-      # produces an environment that cannot open a window at all.
+      # uv's own CPython builds ship without tkinter on Linux, so this
+      # job borrows an interpreter from setup-python.
       - uses: actions/setup-python@v6
         id: python
         with:
@@ -93,14 +88,10 @@ jobs:
           enable-cache: true
       - run: uv sync --locked
       - run: choco install innosetup --no-progress --yes
-      # Run through uv so PyInstaller bundles the locked versions - it
-      # packs whatever is installed in the environment it runs in. The
+      # Through uv, so PyInstaller bundles the locked versions. The
       # installer is built here too, so a broken setup script shows up
-      # on a push rather than during a release.
-      #
-      # No relay is baked in: there is no .env in CI, and a public build
-      # must not carry anyone's credentials. The version says plainly
-      # that this is a CI artifact, not a release.
+      # on a push rather than during a release. No relay is baked in -
+      # there is no .env in CI - and the version says it is not a release.
       - run: uv run poe installer 0.0.0-ci
       - uses: actions/upload-artifact@v5
         with:

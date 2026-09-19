@@ -1,29 +1,19 @@
 """Encrypting the secrets this app keeps on disk.
 
-Two things end up in files on the user's machine: the relay password they
-typed into the settings screen, and the code phrase of an interrupted send
-that the resume feature needs. Both are stored through this module.
+Two of them: the relay password from the settings screen, and the code
+phrase of an interrupted send.
 
-On Windows that means DPAPI (``CryptProtectData``), the same mechanism
-browsers use for saved passwords. The ciphertext is bound to the Windows
-user account, so:
+On Windows that is DPAPI, bound to the user account - another account
+cannot read it, and a copy that leaves the machine is useless. It does
+*not* protect against code already running as that user; nothing stored
+locally can, and pretending otherwise invites misplaced trust.
 
-* another account on the same machine cannot read it,
-* a copy that leaves the machine - a backup, a synced folder, a stolen
-  disk - is useless.
+Elsewhere no keystore is reachable without a dependency, so values are
+stored in the clear and the file is made owner-only instead. The stored
+form says which of the two it is.
 
-It does **not** protect against code already running as that user. Nothing
-stored locally can, and claiming otherwise would be worse than plain text
-because it invites misplaced trust.
-
-Elsewhere there is no keystore reachable without a dependency, so values
-are stored unencrypted and the file is made owner-readable instead. The
-stored form says which of the two it is, so a file never has to be guessed
-at.
-
-Deliberately *not* stored through this module: the relay password baked
-into a build. A binary has to decrypt its own configuration unattended, so
-any key would travel with it. That one is obfuscation, not encryption, and
+Not stored here: the relay baked into a build. A binary must decrypt its
+own configuration unattended, so any key would travel with it - that one
 is documented as readable.
 """
 
@@ -32,13 +22,11 @@ from __future__ import annotations
 import base64
 import sys
 
-#: Marks a value encrypted with Windows DPAPI.
 PREFIX_DPAPI = "dpapi:"
-#: Marks a value this platform could not encrypt.
 PREFIX_PLAIN = "plain:"
 
-#: Mixed into the DPAPI ciphertext so a blob from another application
-#: cannot be dropped into our config file and decrypt successfully.
+#: Mixed into the ciphertext, so a blob from another application cannot
+#: be dropped into our config and decrypt.
 _ENTROPY = b"NowerTransfer/secret/v1"
 
 
@@ -64,10 +52,8 @@ def protect(secret: str) -> str:
 def unprotect(stored: str) -> str:
     """Return the secret behind an on-disk value.
 
-    Returns ``""`` for a value that cannot be decrypted here - a config
-    copied from another machine or account, or a corrupted one. A value
-    written before this module existed, or typed into the file by hand,
-    is returned unchanged.
+    ``""`` if it will not decrypt here - copied from another machine, or
+    corrupt. An untagged value is assumed hand-written and passed through.
     """
     if not stored:
         return ""

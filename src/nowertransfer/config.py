@@ -1,18 +1,11 @@
 """Where the relay address and password come from.
 
-Four layers, each with one job. Later layers win:
+Four layers, later ones winning:
 
-1. ``build``       - the relay this copy was built with. Inside a build
-                     that is the file ``scripts/build.py`` baked in; from a
-                     source checkout it is ``.env`` in the repository root,
-                     so both behave identically.
-2. ``portable``    - ``nowertransfer.toml`` next to the .exe, for dropping a
-                     preconfigured copy on a network share without rebuilding.
-3. ``user``        - written by the in-app settings screen.
-4. ``environment`` - ``NOWERTRANSFER_*`` variables, for CI and scripted runs.
-
-No secret is ever committed to this repository: ``.env`` is git-ignored and
-the baked file only exists inside a build you produce yourself.
+1. ``build``       - baked into the binary, or ``.env`` from a checkout
+2. ``portable``    - ``nowertransfer.toml`` next to the .exe
+3. ``user``        - written by the settings screen
+4. ``environment`` - ``NOWERTRANSFER_*`` variables
 """
 
 from __future__ import annotations
@@ -36,12 +29,10 @@ from .paths import (
 )
 from .secretstore import protect, unprotect
 
-#: croc's own built-in relay password. A relay started without ``--pass``
-#: uses this, so an empty password in our config means "use croc's default"
-#: rather than "send no password at all".
+#: What a relay started without ``--pass`` uses, so an empty password
+#: here means "croc's default", not "no password".
 CROC_DEFAULT_RELAY_PASSWORD = "pass123"
 
-#: Default port of a stock ``schollz/croc`` relay.
 DEFAULT_RELAY_PORT = 9009
 
 BAKED_CONFIG_NAME = "relay.toml"
@@ -54,9 +45,8 @@ ENV_RELAY_PASSWORD = "NOWERTRANSFER_RELAY_PASSWORD"
 ENV_RELAY_MODE = "NOWERTRANSFER_RELAY_MODE"
 ENV_LANGUAGE = "NOWERTRANSFER_LANGUAGE"
 
-#: ``.env`` keys and the setting each one fills. Deliberately short: this
-#: file is the build configuration of a checkout, not a way to set the
-#: ``NOWERTRANSFER_*`` runtime overrides above.
+#: ``.env`` keys and the setting each fills. Short on purpose: this is a
+#: checkout's build configuration, not the runtime overrides above.
 ENV_FILE_KEYS = {
     "RELAY_HOST": "relay_host",
     "RELAY_PASSWORD": "relay_password",
@@ -84,20 +74,15 @@ class Source(Enum):
 
 
 class RelayMode(Enum):
-    """Which relay a transfer is allowed to use.
+    """Which relay a transfer may use.
 
-    The default keeps every byte on infrastructure the user runs. The
-    other two are opt-in, because croc's public relay is a third party:
-    file contents stay end-to-end encrypted either way, but who is
-    talking to whom, when, and how much stops being private.
+    Anything but OWN involves croc's public relay, a third party: file
+    contents stay encrypted either way, but who transfers to whom stops
+    being private. Hence opt-in.
     """
 
-    #: Only the configured relay. Fail if it is unreachable.
     OWN = "own"
-    #: Prefer the configured relay; switch to croc's public one if it
-    #: does not answer, and say so in the UI.
     FALLBACK = "fallback"
-    #: Always use croc's public relay. No relay of your own needed.
     PUBLIC = "public"
 
     @classmethod
@@ -143,10 +128,8 @@ class Settings:
     def relay(self) -> RelayEndpoint:
         """The relay to actually connect to.
 
-        Public mode ignores any stored address. The settings screen keeps
-        one so switching back does not make the user retype it, and an
-        endpoint that quietly outranked the chosen mode would send files
-        somewhere other than where the user asked.
+        Public mode ignores any stored address - the settings screen only
+        keeps it so switching back is easy.
         """
         if self.mode is RelayMode.PUBLIC:
             return RelayEndpoint("")
@@ -158,11 +141,7 @@ class Settings:
 
     @property
     def is_configured(self) -> bool:
-        """Whether the app has somewhere to send things.
-
-        False on first run of a build with no relay baked in - unless the
-        user chose the public relay, which needs no configuration.
-        """
+        """Whether the app has somewhere to send things."""
         return bool(self.relay_host) or self.mode is RelayMode.PUBLIC
 
     @property
@@ -215,11 +194,7 @@ def read_config_file(path: Path) -> dict[str, str]:
 
 
 def build_layer() -> dict[str, str]:
-    """The relay this copy of the app was built with.
-
-    A build reads the file baked into it; a source checkout reads ``.env``,
-    so running from source behaves exactly like running the binary.
-    """
+    """The relay this copy was built with: the baked file, or ``.env``."""
     if is_frozen():
         return read_config_file(baked_config_path())
     return {
@@ -232,9 +207,8 @@ def build_layer() -> dict[str, str]:
 def user_layer() -> dict[str, str]:
     """Settings the user saved, with the relay password decrypted.
 
-    A password that cannot be decrypted here - the config was copied from
-    another machine or account - is dropped rather than surfaced as
-    garbage, so the layer below it applies again.
+    A password that will not decrypt here - a config copied from another
+    machine - is dropped, so the layer below applies again.
     """
     values = read_config_file(user_config_path())
     stored = values.get("relay_password")
@@ -288,9 +262,8 @@ def load_settings() -> Settings:
 def inherited_settings() -> Settings:
     """Settings as they would be *without* the user layer.
 
-    Used when saving so the settings screen only persists what the user
-    actually changed, instead of copying a baked-in password into a
-    plaintext file on disk.
+    Saving compares against these, so a baked-in password is not copied
+    into a plaintext file just because the user pressed Save.
     """
     values: dict[str, str] = {}
     for source, layer in _layers():
@@ -322,8 +295,8 @@ def save_settings(settings: Settings) -> Path:
 def dump_toml(values: Mapping[str, str]) -> str:
     """Serialise a flat string mapping as TOML.
 
-    The stdlib reads TOML but does not write it, and the config is four
-    string keys - a dependency would cost more than these six lines.
+    The stdlib reads TOML but cannot write it, and this is four string
+    keys - not worth a dependency.
     """
     header = (
         "# NowerTransfer settings. Written by the app.\n"

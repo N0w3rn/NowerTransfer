@@ -1,12 +1,8 @@
 """Settings screen: the relay this app talks to.
 
-Every field shows where its current value comes from, so it is obvious
-whether the app is running on a baked-in relay, a file next to the .exe or
-something the user typed here.
-
-Language is deliberately not here - it lives as a toggle on the start
-screen, where someone who opened the app in the wrong language will
-actually find it.
+Every field shows which layer its value came from. Language is not here
+but in the header, where someone who opened the app in the wrong
+language will actually find it.
 """
 
 from __future__ import annotations
@@ -25,15 +21,12 @@ class SettingsView(View):
     def build(self) -> None:
         self.header(self.t("settings.title"), with_language=True)
 
-        #: Widgets that only mean something when the app uses a relay of
-        #: its own. Registered with :meth:`_needs_own_relay` and switched
-        #: as a group, so a new field is one call away from behaving
-        #: correctly instead of needing its own special case.
+        #: Switched as a group by _sync_relay_fields, so a field added
+        #: later needs one call rather than its own special case.
         self._own_relay_only: list[ctk.CTkBaseClass] = []
 
-        # Everything that must stay reachable is packed against the
-        # bottom first. Packed last, a long translation or a small window
-        # squeezes these to nothing instead of the cards above them.
+        # Packed against the bottom first: packed last, pack() squeezes
+        # them to nothing when the screen outgrows the window.
         self.back_button(side="bottom")
         self._message = ctk.CTkLabel(
             self,
@@ -49,9 +42,7 @@ class SettingsView(View):
             side="bottom", fill="x", pady=(8, 0)
         )
 
-        # The fields scroll. Three cards already exceed the minimum
-        # window height, and a screen whose layout depends on nothing
-        # ever being added to it is a screen that breaks next time.
+        # Scrolls: three cards already exceed the minimum window height.
         self._body = ctk.CTkScrollableFrame(
             self, fg_color="transparent", scrollbar_button_color=COLORS.panel_active
         )
@@ -131,10 +122,8 @@ class SettingsView(View):
         for widget in self._own_relay_only:
             widget.configure(state="normal" if usable else "disabled")
             if isinstance(widget, ctk.CTkEntry):
-                # CTkEntry has no text_color_disabled, so disabling it
-                # alone changes nothing on screen - a field that looks
-                # editable and silently ignores typing is worse than one
-                # that was never disabled. Dim it by hand.
+                # CTkEntry has no text_color_disabled: without this it
+                # would look editable and silently ignore typing.
                 widget.configure(
                     text_color=COLORS.text if usable else COLORS.muted,
                     fg_color=COLORS.background if usable else COLORS.panel_hover,
@@ -230,7 +219,6 @@ class SettingsView(View):
         updated.relay_mode = mode.value
         path = save_settings(updated)
 
-        # Re-read from disk so the screen redraws with the real resolved
-        # values and their (possibly changed) sources.
+        # Re-read so the screen shows the resolved values and sources.
         self.window.reload_settings()
         self.window.show_settings(message=self.t("settings.saved", path=path))

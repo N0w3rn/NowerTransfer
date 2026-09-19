@@ -1,21 +1,14 @@
 """Layout checks against the real widgets.
 
-tkinter is fully scriptable in-process, so these build the actual screens,
-let them lay themselves out, and then measure. No screenshots: those would
-differ with every font and platform and be red without anything being
-broken. What is asserted instead are properties that only break when
-something is genuinely wrong.
+These build the actual screens and measure them. No screenshots - those
+go red on a font change with nothing broken. Every check here exists
+because the bug it describes happened: ``pack`` silently shrinks what it
+places last when a screen outgrows its window, leaving a button one
+pixel high, present but unclickable.
 
-Every check here exists because the bug it describes happened. ``pack``
-silently shrinks the widgets it places last when a screen is taller than
-its window, which does not raise, does not warn, and leaves a button
-rendered one pixel high - present, invisible and unclickable.
-
-These need a display. Locally that is your desktop; in CI it is xvfb.
-They skip when there is none, so the suite still runs on a bare machine -
-except when ``NOWERTRANSFER_UI_TESTS=required`` is set, which makes a
-missing display an error. CI sets it, so the job cannot quietly skip
-everything and report success.
+Needs a display: your desktop, or xvfb in CI. They skip without one,
+unless ``NOWERTRANSFER_UI_TESTS=required`` is set - CI does, so the job
+cannot skip everything and report success.
 """
 
 from __future__ import annotations
@@ -34,23 +27,20 @@ from nowertransfer.i18n import Translator  # noqa: E402
 
 REQUIRED = os.environ.get("NOWERTRANSFER_UI_TESTS") == "required"
 
-#: Default size, and the smallest the window can be dragged to - which is
-#: where anything that does not fit shows up first.
+#: Default, and the minimum, where anything too big shows up first.
 SIZES = ["640x580", "580x540"]
 LANGUAGES = ["de", "en"]
 SCREENS = ["home", "send", "receive", "settings"]
 
-#: Below this a widget is not "small", it has been squeezed out of the
-#: layout. Real spacers in this UI are 10px or more.
+#: Below this a widget was squeezed out; real spacers are 10px or more.
 MIN_VISIBLE_PX = 3
 
 
 def _display_available() -> bool:
     """Whether a window can be opened here.
 
-    Deliberately not by opening one: a throwaway ``tkinter.Tk`` becomes
-    the implicit default root, CustomTkinter's trackers attach to it, and
-    destroying it leaves every later window unable to initialise.
+    Not by opening one: a throwaway ``tkinter.Tk`` becomes the implicit
+    default root, and destroying it breaks every later window.
     """
     if sys.platform in {"win32", "darwin"}:
         return True
@@ -90,10 +80,8 @@ class Harness:
     """One window, reconfigured per test.
 
     Tk interpreters cannot be created and destroyed indefinitely in one
-    process: after a handful, the next one fails to initialise with
-    errors about missing tcl files. A test per window would hit that, so
-    the suite opens one and points it at different states instead. It is
-    also an order of magnitude faster.
+    process - the sixth fails with errors about missing tcl files - so a
+    window per test is not an option. Also much faster.
     """
 
     def __init__(self, window, tmp_path) -> None:

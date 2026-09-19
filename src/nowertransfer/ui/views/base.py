@@ -165,8 +165,7 @@ class TransferScreen(View):
         elif event.type is EventType.RETRY:
             self.panel.set_status(self.t("status.retry", seconds=event.seconds))
         elif event.type is EventType.FELL_BACK:
-            # Never silently: the user opted into this, but they should
-            # still see the moment it happens.
+            # Opted into, but never silent.
             self.panel.set_status(self.t("status.fell_back"), error=True)
         elif event.type is EventType.FINISHED:
             self.leave_running(completed=True)
