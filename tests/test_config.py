@@ -1,6 +1,6 @@
 import pytest
 
-from nowertransfer import config
+from nowertransfer import config, secretstore
 
 
 @pytest.fixture
@@ -122,6 +122,27 @@ def test_saving_persists_changed_values(layers):
     assert reloaded.relay_host == "other.example.com:9009"
     assert reloaded.relay_password == "pw"
     assert reloaded.source_of("relay_host") is config.Source.USER
+
+
+def test_the_saved_relay_password_is_not_in_the_clear(layers):
+    settings = config.with_relay(config.load_settings(), "r.example.com", "hunter2")
+    config.save_settings(settings)
+
+    on_disk = layers["user"].read_text(encoding="utf-8")
+    assert "hunter2" not in on_disk or not secretstore.is_encrypting()
+    assert config.load_settings().relay_password == "hunter2"
+
+
+def test_a_password_from_another_machine_is_dropped_not_shown(layers):
+    write(layers["env"], "RELAY_HOST=dev:9009\nRELAY_PASSWORD=frombuild\n")
+    # A dpapi blob this account cannot decrypt, e.g. a copied config.
+    write(
+        layers["user"],
+        'relay_password = "dpapi:AQAAANCMnd8BFdERjHoAwE/Cl+sAAAAA"\n',
+    )
+    settings = config.load_settings()
+    assert settings.relay_password == "frombuild"
+    assert settings.source_of("relay_password") is config.Source.BUILD
 
 
 def test_saved_file_round_trips_awkward_characters(layers, tmp_path):

@@ -1,6 +1,8 @@
 import pytest
 
-from nowertransfer import paths, session
+from nowertransfer import paths, secretstore, session
+
+CODE = "falke-wolke-tiger-nebel-83"
 
 
 @pytest.fixture(autouse=True)
@@ -13,12 +15,37 @@ def test_round_trip(tmp_path):
     payload = tmp_path / "payload.txt"
     payload.write_text("hi", encoding="utf-8")
 
-    session.save_send_session("falke-wolke-tiger-nebel-83", [str(payload)])
+    session.save_send_session(CODE, [str(payload)])
     restored = session.load_send_session()
 
     assert restored is not None
-    assert restored.code == "falke-wolke-tiger-nebel-83"
+    assert restored.code == CODE
     assert restored.paths == [str(payload)]
+
+
+@pytest.mark.skipif(
+    not secretstore.is_encrypting(),
+    reason="no OS keystore on this platform; values are stored in the clear",
+)
+def test_the_code_phrase_is_not_stored_in_the_clear(tmp_path):
+    # The code phrase is croc's end-to-end encryption secret, so the
+    # resume file must not hand it to anyone who opens it.
+    payload = tmp_path / "payload.txt"
+    payload.write_text("hi", encoding="utf-8")
+    session.save_send_session(CODE, [str(payload)])
+
+    assert CODE not in session.session_path().read_text(encoding="utf-8")
+
+
+def test_a_session_from_another_machine_is_not_offered(tmp_path):
+    payload = tmp_path / "payload.txt"
+    payload.write_text("hi", encoding="utf-8")
+    session.session_path().write_text(
+        '{"mode": "send", "code": "dpapi:AQAAANCMnd8BFdERjHoAwE/Cl+s=",'
+        f' "paths": ["{payload.as_posix()}"]}}',
+        encoding="utf-8",
+    )
+    assert session.load_send_session() is None
 
 
 def test_nothing_stored_yields_none():

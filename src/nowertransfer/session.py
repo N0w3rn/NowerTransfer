@@ -2,6 +2,10 @@
 
 Only sends are remembered: the receiving side needs nothing but the code
 phrase, which the user still has.
+
+The stored code phrase is croc's end-to-end encryption secret, so it is
+written through :mod:`~nowertransfer.secretstore` rather than in the
+clear, and the file is removed as soon as the transfer completes.
 """
 
 from __future__ import annotations
@@ -12,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .paths import user_config_dir, write_atomic
+from .secretstore import protect, unprotect
 
 SESSION_FILENAME = "session.json"
 
@@ -27,11 +32,15 @@ def session_path() -> Path:
 
 
 def save_send_session(code: str, paths: list[str]) -> None:
-    payload = {"mode": "send", "code": code, "paths": [str(p) for p in paths]}
+    payload = {
+        "mode": "send",
+        "code": protect(code),
+        "paths": [str(p) for p in paths],
+    }
     # Resume is a convenience; failing to record it must not break a
     # transfer that is about to start.
     with suppress(OSError):
-        write_atomic(session_path(), json.dumps(payload, indent=2))
+        write_atomic(session_path(), json.dumps(payload, indent=2), private=True)
 
 
 def load_send_session() -> SendSession | None:
@@ -47,11 +56,14 @@ def load_send_session() -> SendSession | None:
     if not isinstance(payload, dict) or payload.get("mode") != "send":
         return None
 
-    code = payload.get("code")
+    stored_code = payload.get("code")
     paths = payload.get("paths")
-    if not isinstance(code, str) or not isinstance(paths, list):
+    if not isinstance(stored_code, str) or not isinstance(paths, list):
         return None
 
+    # An undecryptable code means the file came from another machine or
+    # account. There is nothing to resume, so offer nothing.
+    code = unprotect(stored_code)
     existing = [p for p in paths if isinstance(p, str) and Path(p).exists()]
     if not code or not existing:
         return None

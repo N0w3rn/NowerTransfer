@@ -34,6 +34,7 @@ from .paths import (
     user_config_dir,
     write_atomic,
 )
+from .secretstore import protect, unprotect
 
 #: croc's own built-in relay password. A relay started without ``--pass``
 #: uses this, so an empty password in our config means "use croc's default"
@@ -177,6 +178,24 @@ def build_layer() -> dict[str, str]:
     }
 
 
+def user_layer() -> dict[str, str]:
+    """Settings the user saved, with the relay password decrypted.
+
+    A password that cannot be decrypted here - the config was copied from
+    another machine or account - is dropped rather than surfaced as
+    garbage, so the layer below it applies again.
+    """
+    values = read_config_file(user_config_path())
+    stored = values.get("relay_password")
+    if stored:
+        secret = unprotect(stored)
+        if secret:
+            values["relay_password"] = secret
+        else:
+            del values["relay_password"]
+    return values
+
+
 def _environment_layer() -> dict[str, str]:
     layer = {}
     for key, variable in _KEYS.items():
@@ -193,7 +212,7 @@ def _layers() -> list[tuple[Source, dict[str, str]]]:
     return [
         (Source.BUILD, build_layer()),
         (Source.PORTABLE, read_config_file(portable_config_path())),
-        (Source.USER, read_config_file(user_config_path())),
+        (Source.USER, user_layer()),
         (Source.ENVIRONMENT, _environment_layer()),
     ]
 
@@ -241,8 +260,11 @@ def save_settings(settings: Settings) -> Path:
         for key in _KEYS
         if getattr(settings, key) and getattr(settings, key) != getattr(inherited, key)
     }
+    if "relay_password" in payload:
+        payload["relay_password"] = protect(payload["relay_password"])
+
     path = user_config_path()
-    write_atomic(path, dump_toml(payload))
+    write_atomic(path, dump_toml(payload), private=True)
     return path
 
 
@@ -252,7 +274,11 @@ def dump_toml(values: Mapping[str, str]) -> str:
     The stdlib reads TOML but does not write it, and the config is four
     string keys - a dependency would cost more than these six lines.
     """
-    header = "# NowerTransfer settings. Written by the app; safe to edit.\n"
+    header = (
+        "# NowerTransfer settings. Written by the app.\n"
+        "# relay_password is encrypted for this user account; the rest is\n"
+        "# plain and safe to edit.\n"
+    )
     body = "".join(f"{key} = {_toml_string(value)}\n" for key, value in values.items())
     return header + body
 

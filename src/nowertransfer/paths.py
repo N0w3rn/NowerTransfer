@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
+from contextlib import suppress
 from pathlib import Path
 
 from . import APP_NAME
@@ -64,9 +65,19 @@ def default_download_dir() -> Path:
     return downloads if downloads.is_dir() else Path.home()
 
 
-def write_atomic(path: Path, text: str) -> None:
-    """Write ``text`` to ``path`` without leaving a half-written file behind."""
+def write_atomic(path: Path, text: str, *, private: bool = False) -> None:
+    """Write ``text`` to ``path`` without leaving a half-written file behind.
+
+    With ``private``, the file is restricted to its owner before anything
+    is written to it. That is the only at-rest protection available on
+    platforms without a keystore; on Windows the contents are encrypted
+    instead (see :mod:`~nowertransfer.secretstore`).
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
+    temporary.touch(mode=0o600 if private else 0o666, exist_ok=True)
+    if private:
+        with suppress(OSError, NotImplementedError):
+            temporary.chmod(0o600)
     temporary.write_text(text, encoding="utf-8")
     temporary.replace(path)

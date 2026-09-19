@@ -100,6 +100,15 @@ poe build     # build dist/NowerTransfer.exe
 - **Dropped connections retry automatically** until the transfer completes
   or the user cancels. An unreachable relay is told apart from a peer who
   simply has not shown up yet.
+- **Secrets on disk are encrypted to the Windows account** that wrote
+  them, via DPAPI. That covers the relay password saved in the settings
+  screen and the code phrase of an interrupted send. A copy of those files
+  on another machine or account is useless; code already running as that
+  user is not stopped by anything stored locally.
+- **The relay baked into a build is readable**, and cannot be otherwise —
+  a binary has to decrypt its own configuration unattended, so the key
+  would travel with it. Treat an `.exe` you hand out as disclosing its
+  relay to whoever holds it.
 
 ## Layout
 
