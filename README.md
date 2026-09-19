@@ -1,6 +1,6 @@
-<img src="assets/logo.png" alt="" width="104" align="right">
-
 # NowerTransfer
+
+<img src="assets/logo.png" alt="" width="84" align="right">
 
 Send a file to someone through **your own relay**. One window, two buttons.
 
@@ -11,6 +11,12 @@ infrastructure you control.
 
 Under the hood it drives [croc](https://github.com/schollz/croc), which
 handles the encryption, the NAT traversal and the relay protocol.
+
+> **Windows only, for now.** That is where it is built, run and tested.
+> Nothing is deliberately Windows-bound — croc is fetched per platform
+> and the UI is plain tkinter — but no one has run it elsewhere, and
+> secrets are only encrypted at rest on Windows (see below). Treat other
+> platforms as untested rather than unsupported.
 
 ---
 
