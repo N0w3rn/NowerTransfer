@@ -37,6 +37,35 @@ jobs:
       # dependency is not needed here.
       - run: pytest
 
+  # The widget tests need a display. Both runners are tried on purpose:
+  # Linux under xvfb is the reliable path, Windows matches the platform
+  # the app actually ships on and has the font metrics that go with it.
+  # fail-fast is off so one of them failing still shows the other.
+  ui:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      # Turns "no display, skipping" into a failure. Without this the
+      # job would pass by running nothing at all.
+      NOWERTRANSFER_UI_TESTS: required
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes xvfb
+      - run: pip install -e ".[dev]"
+      - name: Check the toolkit is really there
+        run: python -c "import tkinter, customtkinter; print('toolkit ok')"
+      - if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum python -m pytest tests/test_ui_layout.py -v
+      - if: runner.os == 'Windows'
+        run: python -m pytest tests/test_ui_layout.py -v
+
   build:
     runs-on: windows-latest
     needs: [lint, test]

@@ -103,6 +103,13 @@ poe build     # build dist/NowerTransfer.exe
 `poe` on its own lists the tasks. Dependencies are declared in
 `pyproject.toml`; there is no separate requirements file.
 
+`tests/test_ui_layout.py` builds the real screens and measures them —
+that a button did not get squeezed to one pixel, that the longest code
+phrase still fits, that a locked field is visibly locked. It needs a
+display, so it skips on a machine without one and runs under `xvfb` in
+CI. Deliberately no screenshot comparison: that would go red on a font
+change without anything being broken.
+
 ### Versioning
 
 **Every build states its version** — `poe build 1.0.0`. Leave it out and
