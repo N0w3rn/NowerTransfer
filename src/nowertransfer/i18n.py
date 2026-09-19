@@ -169,6 +169,17 @@ CATALOG: dict[str, dict[str, str]] = {
             "offen?"
         ),
     },
+    "error.version_mismatch": {
+        "en": (
+            "The other side is running an older version of this app. Both "
+            "of you need the same one - the transfer protocol changed."
+        ),
+        "de": (
+            "Die Gegenseite nutzt eine ältere Version dieser App. Ihr "
+            "braucht beide dieselbe – das Übertragungsprotokoll hat sich "
+            "geändert."
+        ),
+    },
     "error.croc_start_failed": {
         "en": "croc could not be started.",
         "de": "croc konnte nicht gestartet werden.",

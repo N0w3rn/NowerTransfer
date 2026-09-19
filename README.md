@@ -126,8 +126,15 @@ scripts/
   fetch_croc.py downloads croc from its GitHub releases
 ```
 
-No secrets and no binaries are committed: `croc` is fetched at build time
-and verified against the SHA-256 its release publishes.
+No secrets and no binaries are committed: `croc` is fetched at build time,
+pinned to one release in `scripts/fetch_croc.py` and verified against the
+SHA-256 that release publishes.
+
+**Both sides of a transfer need the same croc major version.** croc 11
+changed its PAKE handshake and refuses croc 10 peers outright, so when the
+pin moves across a major, every copy you handed out has to be replaced.
+The relay is not affected — a croc 11 client talks to a croc 10 relay
+fine. The app detects the mismatch and says so instead of retrying.
 
 Tagged releases are built **without** a relay on purpose — a published
 binary carrying relay credentials would hand every downloader the keys to

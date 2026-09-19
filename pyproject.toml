@@ -22,7 +22,9 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Communications :: File Sharing",
 ]
-dependencies = ["customtkinter>=5.2"]
+# Floor is what the UI is actually developed and verified against, not
+# the oldest release that might happen to work.
+dependencies = ["customtkinter>=6.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.6", "pyinstaller>=6.6", "poethepoet>=0.27"]

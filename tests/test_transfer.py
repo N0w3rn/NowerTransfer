@@ -7,8 +7,10 @@ import pytest
 from nowertransfer.config import CROC_DEFAULT_RELAY_PASSWORD, RelayEndpoint
 from nowertransfer.transfer import (
     TransferWorker,
+    is_hidden_output,
     iter_output_lines,
     looks_like_config_error,
+    looks_like_version_mismatch,
     parse_progress,
 )
 
@@ -45,6 +47,33 @@ def test_parse_progress(line, expected):
 )
 def test_config_error_detection(line, expected):
     assert looks_like_config_error(line) is expected
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        # croc 11 rejects croc 10 peers; waiting cannot fix it.
+        (
+            "peer uses unsupported PAKE protocol version 0; upgrade both croc clients",
+            True,
+        ),
+        ("Error: unsupported PAKE protocol version", True),
+        ("could not connect", False),
+        ("room not ready", False),
+    ],
+)
+def test_version_mismatch_detection(line, expected):
+    assert looks_like_version_mismatch(line) is expected
+
+
+def test_the_public_web_receive_url_is_kept_out_of_the_ui():
+    # croc prints https://getcroc.com/?code=<the code phrase>. That query
+    # string is the end-to-end encryption key; showing it invites pasting
+    # it into a third party's site.
+    assert is_hidden_output("https://getcroc.com/?code=falke-wolke-tiger-83")
+    assert is_hidden_output("Or open: https://getcroc.com/?code=x")
+    assert not is_hidden_output("Sending 'photo.jpg' (2.1 MB)")
+    assert not is_hidden_output("could not connect")
 
 
 def test_output_is_split_on_carriage_returns_too():
@@ -117,6 +146,22 @@ def test_send_ignores_stdin(monkeypatch):
     make_worker(RelayEndpoint("r:9009")).start_send(["a.txt"], "code")
     assert "--ignore-stdin" in captured["command"]
     assert captured["command"][-1] == "a.txt"
+
+
+def test_send_pins_the_data_path_to_the_configured_relay(monkeypatch):
+    # croc's default "auto" transport may route through the public DERP
+    # network, which would defeat the point of a self-hosted relay.
+    captured = {}
+    monkeypatch.setattr(
+        TransferWorker,
+        "_start",
+        lambda self, command, code, cwd: captured.update(command=command),
+    )
+    make_worker(RelayEndpoint("r:9009")).start_send(["a.txt"], "code")
+    command = captured["command"]
+    assert command[command.index("--transport") + 1] == "relay"
+    # It is a flag of the `send` subcommand, so it has to follow it.
+    assert command.index("--transport") > command.index("send")
 
 
 def test_receive_writes_into_the_chosen_directory(monkeypatch, tmp_path):

@@ -6,8 +6,8 @@ git history, and vendoring one means shipping whatever version happened to
 be current when someone cloned. Instead it is fetched from the official
 GitHub releases and checked against the SHA-256 the release publishes.
 
-    python scripts/fetch_croc.py                # latest release
-    python scripts/fetch_croc.py --tag v10.2.2  # pin a version
+    python scripts/fetch_croc.py                # the pinned release
+    python scripts/fetch_croc.py --tag latest   # whatever is newest
 """
 
 from __future__ import annotations
@@ -28,6 +28,11 @@ from pathlib import Path
 REPO = "schollz/croc"
 API = f"https://api.github.com/repos/{REPO}/releases"
 USER_AGENT = "NowerTransfer-build-script"
+
+#: Pinned so two people building this repository ship the same croc.
+#: To move it: run with --tag latest, check `croc send --help` still has
+#: the flags transfer.py passes, and update this constant.
+DEFAULT_TAG = "v11.5.3"
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 VENDOR_DIR = PROJECT_ROOT / "vendor"
@@ -57,7 +62,8 @@ def _get(url: str) -> bytes:
 
 
 def release_metadata(tag: str | None) -> dict:
-    url = f"{API}/tags/{tag}" if tag else f"{API}/latest"
+    tag = tag or DEFAULT_TAG
+    url = f"{API}/latest" if tag == "latest" else f"{API}/tags/{tag}"
     return json.loads(_get(url))
 
 
@@ -156,7 +162,10 @@ def fetch(tag: str | None = None, dest_dir: Path = VENDOR_DIR) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--tag", help="release tag to pin, e.g. v10.2.2")
+    parser.add_argument(
+        "--tag",
+        help=f"release tag to fetch (default {DEFAULT_TAG}; 'latest' for newest)",
+    )
     parser.add_argument(
         "--dest", type=Path, default=VENDOR_DIR, help="where to put the binary"
     )

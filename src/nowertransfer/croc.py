@@ -18,13 +18,15 @@ VENDOR_DIRNAME = "vendor"
 def candidate_paths() -> Iterator[Path]:
     """Every place we look for croc, in order of preference.
 
-    Next to the .exe first so a user can drop in their own build, then the
-    copy bundled into the one-file build, then the source checkout's
-    ``vendor/`` directory, and finally whatever is on ``PATH``.
+    The copy shipped with the app comes first: it is the one whose
+    checksum was verified at build time, and preferring a binary sitting
+    next to the .exe would let anyone who can write to that directory
+    decide what this app executes. The other locations are the fallback
+    for a build that bundles nothing.
     """
-    yield executable_dir() / BINARY_NAME
     yield bundle_dir() / BINARY_NAME
     yield project_root() / VENDOR_DIRNAME / BINARY_NAME
+    yield executable_dir() / BINARY_NAME
 
 
 def find_croc() -> Path | None:
