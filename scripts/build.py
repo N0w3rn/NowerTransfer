@@ -41,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fetch_croc import binary_name
 from fetch_croc import main as fetch_croc_main
+from nowertransfer import FALLBACK_VERSION, VERSION_STAMP
 from nowertransfer.config import dump_toml, normalise_relay_host
 from nowertransfer.envfile import read_env_file
 
@@ -68,6 +69,51 @@ def resolve_relay(args: argparse.Namespace) -> dict[str, str]:
     return baked
 
 
+def _git(*args: str) -> str | None:
+    """Run a git command, or return None if git cannot answer."""
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def resolve_app_version(explicit: str | None) -> str | None:
+    """The version to stamp into the build, or ``None`` to leave it alone.
+
+    A tagged release is the authoritative case: GitHub Actions puts the
+    tag in GITHUB_REF_NAME, so `v1.2.0` becomes `1.2.0`.
+
+    Anything else is somebody's local build, and saying so beats letting
+    it claim to be the release. It gets the committed version with the
+    commit appended - `1.0.0+bf5f5f9.dirty` - which reads as a version
+    rather than as a bare hash in the window footer.
+    """
+    if explicit:
+        return explicit.lstrip("vV")
+
+    ref = os.environ.get("GITHUB_REF_NAME", "")
+    if ref[:1] in "vV" and ref[1:2].isdigit():
+        return ref.lstrip("vV")
+
+    tag = _git("describe", "--tags", "--exact-match")
+    if tag:
+        return tag.lstrip("vV")
+
+    commit = _git("rev-parse", "--short", "HEAD")
+    if not commit:
+        return None
+    suffix = ".dirty" if _git("status", "--porcelain") else ""
+    return f"{FALLBACK_VERSION}+{commit}{suffix}"
+
+
 def ensure_croc(tag: str | None, skip: bool) -> Path:
     binary = VENDOR_DIR / binary_name()
     if binary.exists():
@@ -85,7 +131,9 @@ def ensure_croc(tag: str | None, skip: bool) -> Path:
     return binary
 
 
-def pyinstaller_command(croc: Path, relay_file: Path | None) -> list[str]:
+def pyinstaller_command(
+    croc: Path, relay_file: Path | None, version_file: Path | None = None
+) -> list[str]:
     separator = os.pathsep
     command = [
         sys.executable,
@@ -112,6 +160,8 @@ def pyinstaller_command(croc: Path, relay_file: Path | None) -> list[str]:
     ]
     if relay_file is not None:
         command += ["--add-data", f"{relay_file}{separator}."]
+    if version_file is not None:
+        command += ["--add-data", f"{version_file}{separator}."]
     if ICON_PATH.exists():
         # --icon sets the .exe's own icon; the running window loads the
         # bundled copy itself, so it has to be packed in as well.
@@ -132,7 +182,11 @@ def main(argv: list[str] | None = None) -> int:
         "--relay-password",
         help="relay password (omit to use croc's default)",
     )
-    parser.add_argument("--croc-tag", help="pin a croc release, e.g. v10.2.2")
+    parser.add_argument("--croc-tag", help="pin a croc release, e.g. v11.5.3")
+    parser.add_argument(
+        "--app-version",
+        help="version to stamp in (default: the release tag, else git describe)",
+    )
     parser.add_argument(
         "--no-fetch",
         action="store_true",
@@ -166,7 +220,16 @@ def main(argv: list[str] | None = None) -> int:
                 "first start (see --help)"
             )
 
-        command = pyinstaller_command(croc, relay_file)
+        version_file: Path | None = None
+        version = resolve_app_version(args.app_version)
+        if version:
+            version_file = Path(staging) / VERSION_STAMP
+            version_file.write_text(version, encoding="utf-8")
+            print(f"version: {version}")
+        else:
+            print(f"version: {FALLBACK_VERSION} (no tag found)")
+
+        command = pyinstaller_command(croc, relay_file, version_file)
         print("running:", " ".join(command))
         result = subprocess.run(command, cwd=PROJECT_ROOT, check=False)
 

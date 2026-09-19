@@ -97,6 +97,20 @@ poe build     # build dist/NowerTransfer.exe
 `poe` on its own lists the tasks. Dependencies are declared in
 `pyproject.toml`; there is no separate requirements file.
 
+### Versioning
+
+Push a tag and the release build stamps itself with it, so the number in
+the window footer is the one someone downloaded:
+
+```bash
+git tag v1.1.0 && git push --tags
+```
+
+`FALLBACK_VERSION` in `src/nowertransfer/__init__.py` is the single place
+the version is written — `pyproject.toml` reads that same line. A build
+made outside a tag says so: `1.0.0+bf5f5f9.dirty` rather than claiming to
+be the release.
+
 ---
 
 ## How it works
