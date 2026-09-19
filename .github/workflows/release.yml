@@ -12,16 +12,19 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-      - run: pip install -e ".[dev]"
+          enable-cache: true
+      - run: uv sync --locked
 
-      # Deliberately built without a relay. A published binary that
-      # carried someone's relay credentials would hand every downloader
-      # the keys to that relay. The released app asks on first start;
-      # build locally with a .env to hand out a preconfigured copy.
-      - run: poe build
+      # Built through uv so the binary contains the locked library
+      # versions, and deliberately without a relay: a published binary
+      # carrying relay credentials would hand every downloader the keys
+      # to that relay. The released app asks on first start; build
+      # locally with a .env to hand out a preconfigured copy.
+      #
+      # No version argument - the workflow takes it from the tag.
+      - run: uv run poe build
 
       - uses: softprops/action-gh-release@v2
         with:

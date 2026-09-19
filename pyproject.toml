@@ -27,7 +27,10 @@ classifiers = [
 # the oldest release that might happen to work.
 dependencies = ["customtkinter>=6.0"]
 
-[project.optional-dependencies]
+# Development tools. A group rather than an optional extra: these are
+# not something anyone installing the app should be offered, and `uv
+# sync` picks the group up on its own, so the bootstrap stays one word.
+[dependency-groups]
 dev = ["pytest>=8.0", "ruff>=0.6", "pyinstaller>=6.6", "poethepoet>=0.27"]
 
 [project.urls]
@@ -55,6 +58,8 @@ lint = { cmd = "ruff check .", help = "Lint" }
 fmt = { cmd = "ruff format .", help = "Format the code" }
 "fmt:check" = { cmd = "ruff format --check .", help = "Fail if the code is unformatted" }
 check = { sequence = ["lint", "fmt:check", "test"], help = "Everything CI runs" }
+lock = { cmd = "uv lock", help = "Refresh uv.lock after changing dependencies" }
+"lock:check" = { cmd = "uv lock --check", help = "Fail if uv.lock is out of date" }
 
 [tool.ruff]
 line-length = 88

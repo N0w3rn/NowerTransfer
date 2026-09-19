@@ -89,19 +89,31 @@ is never silent.
 
 ## Development
 
+Needs [uv](https://docs.astral.sh/uv/) and nothing else — it fetches the
+right Python itself.
+
 ```bash
-pip install -e ".[dev]"
+uv sync       # once: creates .venv from uv.lock
 poe croc      # download the croc binary, checksum-verified
 poe app       # run from source
 poe test      # the test suite
 poe lint      # ruff check
 poe fmt       # ruff format
 poe check     # everything CI runs
-poe build     # build dist/NowerTransfer.exe
+poe build 1.0.0
+poe lock      # after changing dependencies
 ```
 
-`poe` on its own lists the tasks. Dependencies are declared in
-`pyproject.toml`; there is no separate requirements file.
+`poe` on its own lists the tasks. `uv sync` is the only command that is
+not one, and you run it once. Activate `.venv` — VS Code does it for you
+— or prefix with `uv run`.
+
+Versions are pinned in `uv.lock`, which covers Linux, Windows and macOS
+in one file. CI runs `uv sync --locked`, which fails if `pyproject.toml`
+changed without `poe lock` being run, and the executable is built inside
+that same environment — so the binary contains the versions the lockfile
+names. `.python-version` is the interpreter to develop against;
+`requires-python` stays the supported range.
 
 `tests/test_ui_layout.py` builds the real screens and measures them —
 that a button did not get squeezed to one pixel, that the longest code

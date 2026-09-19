@@ -8,17 +8,21 @@ on:
 permissions:
   contents: read
 
+# `uv sync --locked` installs exactly what uv.lock says and fails if
+# pyproject.toml has changed without the lock being refreshed. That is
+# what stops the lockfile from quietly going stale, and it means CI runs
+# against the same versions a developer does.
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-      - run: pip install ruff
-      - run: ruff check .
-      - run: ruff format --check .
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run poe lint
+      - run: uv run poe fmt:check
 
   test:
     strategy:
@@ -29,18 +33,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v6
         with:
+          enable-cache: true
           python-version: ${{ matrix.python-version }}
-      - run: pip install pytest
-      # The tests cover the logic, not the widgets, so the GUI
-      # dependency is not needed here.
-      - run: pytest
+      - run: uv sync --locked
+      # The widget tests have a job of their own, where a display exists.
+      - run: uv run pytest --ignore=tests/test_ui_layout.py
 
   # The widget tests need a display. Both runners are tried on purpose:
   # Linux under xvfb is the reliable path, Windows matches the platform
   # the app actually ships on and has the font metrics that go with it.
-  # fail-fast is off so one of them failing still shows the other.
   ui:
     strategy:
       fail-fast: false
@@ -53,33 +56,35 @@ jobs:
       NOWERTRANSFER_UI_TESTS: required
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
+          enable-cache: true
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --yes xvfb
-      - run: pip install -e ".[dev]"
+      - run: uv sync --locked
       - name: Check the toolkit is really there
-        run: python -c "import tkinter, customtkinter; print('toolkit ok')"
+        run: uv run python -c "import tkinter, customtkinter; print('toolkit ok')"
       - if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum python -m pytest tests/test_ui_layout.py -v
+        run: xvfb-run --auto-servernum uv run pytest tests/test_ui_layout.py -v
       - if: runner.os == 'Windows'
-        run: python -m pytest tests/test_ui_layout.py -v
+        run: uv run pytest tests/test_ui_layout.py -v
 
   build:
     runs-on: windows-latest
-    needs: [lint, test]
+    needs: [lint, test, ui]
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-      - run: pip install -e ".[dev]"
-      # This only checks that the build still works. No relay is baked
-      # in - there is no .env in CI, and a public build must not carry
-      # anyone's credentials - and the version says plainly that the
-      # artifact is a CI build, not a release.
-      - run: poe build 0.0.0-ci
+          enable-cache: true
+      - run: uv sync --locked
+      # Run through uv so PyInstaller bundles the locked versions - it
+      # packs whatever is installed in the environment it runs in.
+      #
+      # No relay is baked in: there is no .env in CI, and a public build
+      # must not carry anyone's credentials. The version says plainly
+      # that this is a CI artifact, not a release.
+      - run: uv run poe build 0.0.0-ci
       - uses: actions/upload-artifact@v5
         with:
           name: NowerTransfer-windows
