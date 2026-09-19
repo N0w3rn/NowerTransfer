@@ -1,8 +1,12 @@
-"""Settings screen: relay endpoint and language.
+"""Settings screen: the relay this app talks to.
 
 Every field shows where its current value comes from, so it is obvious
 whether the app is running on a baked-in relay, a file next to the .exe or
 something the user typed here.
+
+Language is deliberately not here - it lives as a toggle on the start
+screen, where someone who opened the app in the wrong language will
+actually find it.
 """
 
 from __future__ import annotations
@@ -10,7 +14,6 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from ...config import save_settings, with_relay
-from ...i18n import LANGUAGES
 from ..theme import COLORS, NEUTRAL_ACCENT, PAD_CARD, RECEIVE_ACCENT, font
 from ..widgets import Card, primary_button
 from .base import View
@@ -21,14 +24,11 @@ class SettingsView(View):
 
     def build(self) -> None:
         self.header(self.t("settings.title"))
-        if not self.window.settings.is_configured:
-            self._intro()
-        self._relay_card()
-        self._language_card()
 
-        primary_button(self, self.t("settings.save"), RECEIVE_ACCENT, self._save).pack(
-            fill="x", pady=(4, 8)
-        )
+        # Everything that must stay reachable is packed against the
+        # bottom first. Packed last, a long translation or a small window
+        # squeezes these to nothing instead of the cards above them.
+        self.back_button(side="bottom")
         self._message = ctk.CTkLabel(
             self,
             text=str(self.options.get("message", "")),
@@ -38,8 +38,14 @@ class SettingsView(View):
             justify="left",
             anchor="w",
         )
-        self._message.pack(fill="x")
-        self.back_button()
+        self._message.pack(side="bottom", fill="x", pady=(6, 0))
+        primary_button(self, self.t("settings.save"), RECEIVE_ACCENT, self._save).pack(
+            side="bottom", fill="x", pady=(8, 0)
+        )
+
+        if not self.window.settings.is_configured:
+            self._intro()
+        self._relay_card()
 
     # ------------------------------------------------------------------
     def _intro(self) -> None:
@@ -109,26 +115,6 @@ class SettingsView(View):
             f"({self._source_text('relay_password')})"
         )
 
-    def _language_card(self) -> None:
-        card = Card(self)
-        card.pack(fill="x", pady=(0, 12))
-        card.caption(self.t("settings.language"))
-        row = card.row(pady=(4, PAD_CARD))
-        self._language = ctk.CTkSegmentedButton(
-            row,
-            values=list(LANGUAGES.values()),
-            height=32,
-            font=font(12),
-            fg_color=COLORS.background,
-            selected_color=COLORS.panel_active,
-            selected_hover_color=COLORS.panel_active,
-            unselected_color=COLORS.panel,
-            unselected_hover_color=COLORS.panel_hover,
-            text_color=COLORS.text,
-        )
-        self._language.set(LANGUAGES[self.t.language])
-        self._language.pack(side="left")
-
     def _source_text(self, key: str) -> str:
         source = self.window.settings.source_of(key)
         return self.t("settings.source", source=self.t(f"source.{source.value}"))
@@ -145,14 +131,7 @@ class SettingsView(View):
             )
             return
 
-        chosen = self._language.get()
-        language = next(
-            (code for code, name in LANGUAGES.items() if name == chosen),
-            self.t.language,
-        )
-
         updated = with_relay(self.window.settings, host, self._password_entry.get())
-        updated.language = language
         path = save_settings(updated)
 
         # Re-read from disk so the screen redraws with the real resolved

@@ -204,7 +204,6 @@ CATALOG: dict[str, dict[str, str]] = {
         "de": "leer lassen für croc-Standard",
     },
     "settings.show_password": {"en": "Show", "de": "Zeigen"},
-    "settings.language": {"en": "Language", "de": "Sprache"},
     "settings.save": {"en": "Save", "de": "Speichern"},
     "settings.saved": {"en": "Saved to {path}", "de": "Gespeichert unter {path}"},
     "settings.invalid_host": {

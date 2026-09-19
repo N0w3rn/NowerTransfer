@@ -21,7 +21,6 @@ class ReceiveView(TransferScreen):
         self._code_card()
         self._target_card()
         self.build_action_area(self.t("receive.start"))
-        self.back_button()
 
     # ------------------------------------------------------------------
     def _code_card(self) -> None:

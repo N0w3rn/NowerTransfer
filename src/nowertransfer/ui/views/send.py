@@ -22,7 +22,6 @@ class SendView(TransferScreen):
         self._selection_card()
         self._code_card()
         self.build_action_area(self.t("send.start"))
-        self.back_button()
 
     # ------------------------------------------------------------------
     def _selection_card(self) -> None:

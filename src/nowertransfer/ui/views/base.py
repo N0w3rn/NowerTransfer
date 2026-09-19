@@ -86,9 +86,9 @@ class View(ctk.CTkFrame):
         switch.set(self.t.language.upper())
         return switch
 
-    def back_button(self) -> None:
+    def back_button(self, side: str = "top") -> None:
         link_button(self, self.t("nav.back"), self.window.show_home, width=90).pack(
-            anchor="w", pady=(10, 0)
+            side=side, anchor="w", pady=(10, 0)
         )
 
 
@@ -100,6 +100,14 @@ class TransferScreen(View):
     """
 
     def build_action_area(self, start_label: str) -> None:
+        """The bottom half of a transfer screen: button, panel, back link.
+
+        The back link is packed first so it claims its space before the
+        panel expands into what is left. Packed last it gets squeezed to
+        nothing in a small window.
+        """
+        self.back_button(side="bottom")
+
         self._start_label = start_label
         self.action = primary_button(
             self, start_label, self.accent, self._on_action_pressed
