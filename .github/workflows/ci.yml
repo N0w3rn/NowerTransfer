@@ -56,18 +56,32 @@ jobs:
       NOWERTRANSFER_UI_TESTS: required
     steps:
       - uses: actions/checkout@v5
+      # This job borrows its interpreter from setup-python. uv's own
+      # CPython builds ship without tkinter on Linux, so `uv sync` alone
+      # produces an environment that cannot open a window at all.
+      - uses: actions/setup-python@v6
+        id: python
+        with:
+          python-version: "3.12"
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --yes xvfb
-      - run: uv sync --locked
+      - run: uv sync --locked --python "${{ steps.python.outputs.python-path }}"
       - name: Check the toolkit is really there
-        run: uv run python -c "import tkinter, customtkinter; print('toolkit ok')"
+        run: >
+          uv run --python "${{ steps.python.outputs.python-path }}"
+          python -c "import tkinter, customtkinter; print('toolkit ok')"
       - if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum uv run pytest tests/test_ui_layout.py -v
+        run: >
+          xvfb-run --auto-servernum
+          uv run --python "${{ steps.python.outputs.python-path }}"
+          pytest tests/test_ui_layout.py -v
       - if: runner.os == 'Windows'
-        run: uv run pytest tests/test_ui_layout.py -v
+        run: >
+          uv run --python "${{ steps.python.outputs.python-path }}"
+          pytest tests/test_ui_layout.py -v
 
   build:
     runs-on: windows-latest
