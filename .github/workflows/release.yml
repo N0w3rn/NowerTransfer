@@ -16,17 +16,24 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked
+      - run: choco install innosetup --no-progress --yes
 
-      # Built through uv so the binary contains the locked library
-      # versions, and deliberately without a relay: a published binary
-      # carrying relay credentials would hand every downloader the keys
-      # to that relay. The released app asks on first start; build
-      # locally with a .env to hand out a preconfigured copy.
+      # Builds the executable and wraps it in the installer, both
+      # through uv so they contain the locked library versions.
+      #
+      # Deliberately without a relay: a published binary carrying relay
+      # credentials would hand every downloader the keys to that relay.
+      # The released app asks on first start; build locally with a .env
+      # to hand out a preconfigured copy.
       #
       # No version argument - the workflow takes it from the tag.
-      - run: uv run poe build
+      - run: uv run poe installer
 
+      # Both are published: the installer for people who want it in
+      # their start menu, the bare .exe for a portable copy.
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/NowerTransfer.exe
+          files: |
+            dist/NowerTransfer.exe
+            dist/NowerTransfer-*-setup.exe
           generate_release_notes: true

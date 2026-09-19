@@ -48,6 +48,11 @@ poe build 1.0.0             # the version this build calls itself
 
 **3. Hand out `dist/NowerTransfer.exe`.** That's it.
 
+`poe installer 1.0.0` produces `dist/NowerTransfer-1.0.0-setup.exe`
+instead — same app, with a start menu entry and an uninstaller. It
+installs for the current user, so there is no administrator prompt.
+Releases carry both.
+
 The relay is baked into the binary, so recipients get a working app rather
 than a setup task.
 
@@ -101,6 +106,7 @@ poe lint      # ruff check
 poe fmt       # ruff format
 poe check     # everything CI runs
 poe build 1.0.0
+poe installer 1.0.0   # needs Inno Setup: winget install JRSoftware.InnoSetup
 poe lock      # after changing dependencies
 ```
 
@@ -194,8 +200,11 @@ src/nowertransfer/
   i18n.py       German / English catalogue
   ui/           theme, widgets, one module per screen
 scripts/
-  build.py      builds the executable, bakes in the relay
-  fetch_croc.py downloads croc from its GitHub releases
+  build.py         builds the executable, bakes in the relay
+  make_installer.py wraps it in an Inno Setup installer
+  fetch_croc.py    downloads croc from its GitHub releases
+installer/
+  NowerTransfer.iss the setup script
 ```
 
 No secrets are committed, and no third-party binaries: `croc` is fetched

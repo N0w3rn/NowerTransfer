@@ -92,15 +92,20 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked
+      - run: choco install innosetup --no-progress --yes
       # Run through uv so PyInstaller bundles the locked versions - it
-      # packs whatever is installed in the environment it runs in.
+      # packs whatever is installed in the environment it runs in. The
+      # installer is built here too, so a broken setup script shows up
+      # on a push rather than during a release.
       #
       # No relay is baked in: there is no .env in CI, and a public build
       # must not carry anyone's credentials. The version says plainly
       # that this is a CI artifact, not a release.
-      - run: uv run poe build 0.0.0-ci
+      - run: uv run poe installer 0.0.0-ci
       - uses: actions/upload-artifact@v5
         with:
           name: NowerTransfer-windows
-          path: dist/NowerTransfer.exe
+          path: |
+            dist/NowerTransfer.exe
+            dist/NowerTransfer-*-setup.exe
           if-no-files-found: error

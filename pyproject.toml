@@ -53,6 +53,7 @@ packages = ["src/nowertransfer"]
 app = { cmd = "python -m nowertransfer", help = "Run the app from source" }
 croc = { cmd = "python scripts/fetch_croc.py", help = "Download the croc binary" }
 build = { cmd = "python scripts/build.py", help = "Build the executable into dist/" }
+installer = { cmd = "python scripts/make_installer.py", help = "Build the Windows installer" }
 test = { cmd = "pytest", help = "Run the test suite" }
 lint = { cmd = "ruff check .", help = "Lint" }
 fmt = { cmd = "ruff format .", help = "Format the code" }
@@ -76,6 +77,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "C4", "PTH"]
 "src/nowertransfer/i18n.py" = ["RUF001"]
 # sys.path has to be prepared before the local imports.
 "scripts/build.py" = ["E402"]
+"scripts/make_installer.py" = ["E402"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
