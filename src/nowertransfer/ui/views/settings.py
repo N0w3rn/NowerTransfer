@@ -1,8 +1,8 @@
 """Settings screen: the relay this app talks to.
 
-Every field shows which layer its value came from. Language is not here
-but in the header, where someone who opened the app in the wrong
-language will actually find it.
+Every field shows which layer its value came from. Language is not one
+of them: it is the header toggle, the same control as on the start
+screen, so there is only ever one way to change it.
 """
 
 from __future__ import annotations
@@ -21,8 +21,9 @@ class SettingsView(View):
     def build(self) -> None:
         self.header(self.t("settings.title"), with_language=True)
 
-        #: Switched as a group by _sync_relay_fields, so a field added
-        #: later needs one call rather than its own special case.
+        #: Register with _needs_own_relay; _sync_relay_fields switches
+        #: them as a group. A relay-only widget added without that call
+        #: stays editable in PUBLIC mode.
         self._own_relay_only: list[ctk.CTkBaseClass] = []
 
         # Packed against the bottom first: packed last, pack() squeezes

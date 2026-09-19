@@ -6,12 +6,14 @@ import pytest
 
 from nowertransfer.config import CROC_DEFAULT_RELAY_PASSWORD, RelayEndpoint
 from nowertransfer.transfer import (
+    ERROR_RELAY_PASSWORD,
     EventType,
     TransferWorker,
     is_hidden_output,
     iter_output_lines,
     looks_like_config_error,
     looks_like_version_mismatch,
+    looks_like_wrong_relay_password,
     parse_progress,
 )
 
@@ -48,6 +50,35 @@ def test_parse_progress(line, expected):
 )
 def test_config_error_detection(line, expected):
     assert looks_like_config_error(line) is expected
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        # Verified against croc: this is what a wrong relay password
+        # produces. A wrong code phrase produces no message at all, it
+        # just waits, so blaming the code phrase here misdirects the user.
+        ("could not connect to 127.0.0.1:9009: bad password", True),
+        ("WRONG PASSWORD", True),
+        ("could not connect to relay", False),
+        ("room not ready", False),
+    ],
+)
+def test_a_refused_password_is_the_relay_not_the_code_phrase(line, expected):
+    assert looks_like_wrong_relay_password(line) is expected
+
+
+def test_a_refused_password_is_reported_as_such():
+    events = Queue()
+    worker = TransferWorker(
+        Path("croc"), RelayEndpoint("r:9009", "wrong"), events, retry_delay=0
+    )
+    emitted, _relays = drive(
+        worker, events, last_line="could not connect to r:9009: bad password"
+    )
+
+    failed = [event for event in emitted if event.type is EventType.FAILED]
+    assert failed and failed[0].text == ERROR_RELAY_PASSWORD
 
 
 @pytest.mark.parametrize(
@@ -193,10 +224,14 @@ def drive(worker, events, exit_code=1, last_line="", runs=12):
 
     worker._run_once = fake_run_once
     worker._run_until_done(["croc"], "code", None)
-    types = []
+    emitted = []
     while not events.empty():
-        types.append(events.get_nowait().type)
-    return types, seen_relays
+        emitted.append(events.get_nowait())
+    return emitted, seen_relays
+
+
+def types(emitted) -> list[EventType]:
+    return [event.type for event in emitted]
 
 
 UNREACHABLE = "relay connection failed: could not connect to r:9009"
@@ -209,9 +244,9 @@ def test_an_unreachable_relay_is_reported_rather_than_retried_forever():
     worker = TransferWorker(
         Path("croc"), RelayEndpoint("r:9009"), events, retry_delay=0
     )
-    types, relays = drive(worker, events, last_line=UNREACHABLE)
+    emitted, relays = drive(worker, events, last_line=UNREACHABLE)
 
-    assert EventType.FAILED in types
+    assert EventType.FAILED in types(emitted)
     assert len(relays) == 3  # _RELAY_ERROR_LIMIT, not until cancelled
 
 
@@ -221,10 +256,10 @@ def test_a_peer_that_has_not_arrived_yet_is_waited_out():
     worker = TransferWorker(
         Path("croc"), RelayEndpoint("r:9009"), events, retry_delay=0
     )
-    types, _relays = drive(worker, events, last_line="room not ready", runs=8)
+    emitted, _relays = drive(worker, events, last_line="room not ready", runs=8)
 
-    assert EventType.FAILED not in types
-    assert types.count(EventType.RETRY) >= 5
+    assert EventType.FAILED not in types(emitted)
+    assert types(emitted).count(EventType.RETRY) >= 5
 
 
 def test_a_version_mismatch_gives_up_at_once():
@@ -232,10 +267,10 @@ def test_a_version_mismatch_gives_up_at_once():
     worker = TransferWorker(
         Path("croc"), RelayEndpoint("r:9009"), events, retry_delay=0
     )
-    types, relays = drive(
+    emitted, relays = drive(
         worker, events, last_line="peer uses unsupported PAKE protocol version 0"
     )
-    assert types == [EventType.FAILED]
+    assert types(emitted) == [EventType.FAILED]
     assert len(relays) == 1
 
 
@@ -248,14 +283,14 @@ def test_fallback_moves_to_the_public_relay_and_announces_it():
         retry_delay=0,
         allow_public_fallback=True,
     )
-    types, relays = drive(worker, events, last_line=UNREACHABLE, runs=8)
+    emitted, relays = drive(worker, events, last_line=UNREACHABLE, runs=8)
 
-    assert EventType.FELL_BACK in types
+    assert EventType.FELL_BACK in types(emitted)
     # First the user's relay, then croc's own (no CROC_RELAY set).
     assert relays[0] == "r:9009"
     assert relays[-1] is None
     # The switch must be visible, not silent.
-    assert types.index(EventType.FELL_BACK) < len(types)
+    assert EventType.FELL_BACK in types(emitted)
 
 
 def test_without_fallback_the_transfer_never_leaves_the_configured_relay():
@@ -263,9 +298,9 @@ def test_without_fallback_the_transfer_never_leaves_the_configured_relay():
     worker = TransferWorker(
         Path("croc"), RelayEndpoint("r:9009"), events, retry_delay=0
     )
-    types, relays = drive(worker, events, last_line=UNREACHABLE)
+    emitted, relays = drive(worker, events, last_line=UNREACHABLE)
 
-    assert EventType.FELL_BACK not in types
+    assert EventType.FELL_BACK not in types(emitted)
     assert all(relay == "r:9009" for relay in relays)
 
 
@@ -274,8 +309,8 @@ def test_a_successful_run_finishes_immediately():
     worker = TransferWorker(
         Path("croc"), RelayEndpoint("r:9009"), events, retry_delay=0
     )
-    types, relays = drive(worker, events, exit_code=0)
-    assert types == [EventType.FINISHED]
+    emitted, relays = drive(worker, events, exit_code=0)
+    assert types(emitted) == [EventType.FINISHED]
     assert len(relays) == 1
 
 

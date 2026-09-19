@@ -145,6 +145,21 @@ def test_a_password_from_another_machine_is_dropped_not_shown(layers):
     assert settings.source_of("relay_password") is config.Source.BUILD
 
 
+def test_a_default_is_not_saved_as_though_it_were_chosen(layers):
+    # load_settings fills in a download directory. Saving used to write
+    # that back, so the config recorded a path the user never picked.
+    config.save_settings(config.load_settings())
+    assert "download_dir" not in config.read_config_file(layers["user"])
+
+
+def test_a_chosen_download_directory_is_saved(layers, tmp_path):
+    settings = config.load_settings()
+    settings.download_dir = str(tmp_path / "elsewhere")
+    config.save_settings(settings)
+
+    assert config.load_settings().download_dir == str(tmp_path / "elsewhere")
+
+
 def test_saved_file_round_trips_awkward_characters(layers, tmp_path):
     settings = config.with_relay(
         config.load_settings(), "relay.example.com", 'a"b\\c\td'

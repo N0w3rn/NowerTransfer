@@ -64,10 +64,7 @@ def find_iscc() -> Path | None:
     if on_path:
         return Path(on_path)
 
-    for candidate in _ISCC_CANDIDATES:
-        if candidate.parent.parent.name and candidate.is_file():
-            return candidate
-    return None
+    return next((c for c in _ISCC_CANDIDATES if c.is_file()), None)
 
 
 def numeric_version(version: str) -> str:

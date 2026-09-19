@@ -59,7 +59,7 @@ class ReceiveView(TransferScreen):
     def _choose_target(self) -> None:
         chosen = filedialog.askdirectory(title=self.t("receive.target_dialog"))
         if chosen:
-            self.window.receive_dir = Path(chosen)
+            self.window.set_download_dir(Path(chosen))
             self._target_label.configure(text=chosen)
 
     # ------------------------------------------------------------------

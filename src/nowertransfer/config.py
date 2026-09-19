@@ -253,24 +253,27 @@ def load_settings() -> Settings:
             values[key] = value
             sources[key] = source
 
-    settings = Settings(sources=sources, **values)
-    if not settings.download_dir:
-        settings.download_dir = str(default_download_dir())
-    return settings
+    return _with_defaults(Settings(sources=sources, **values))
 
 
 def inherited_settings() -> Settings:
     """Settings as they would be *without* the user layer.
 
-    Saving compares against these, so a baked-in password is not copied
-    into a plaintext file just because the user pressed Save.
+    Saving compares against these, so neither a baked-in password nor a
+    computed default is written to disk as though the user chose it.
     """
     values: dict[str, str] = {}
     for source, layer in _layers():
         if source is Source.USER:
             continue
         values.update({k: v for k, v in layer.items() if v})
-    return Settings(**values)
+    return _with_defaults(Settings(**values))
+
+
+def _with_defaults(settings: Settings) -> Settings:
+    if not settings.download_dir:
+        settings.download_dir = str(default_download_dir())
+    return settings
 
 
 # ----------------------------------------------------------------------

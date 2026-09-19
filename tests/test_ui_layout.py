@@ -80,8 +80,8 @@ class Harness:
     """One window, reconfigured per test.
 
     Tk interpreters cannot be created and destroyed indefinitely in one
-    process - the sixth fails with errors about missing tcl files - so a
-    window per test is not an option. Also much faster.
+    process: after a handful, the next fails with errors about missing
+    tcl files. A window per test would hit that. Also much faster.
     """
 
     def __init__(self, window, tmp_path) -> None:
@@ -193,6 +193,30 @@ def test_the_longest_possible_code_still_fits(ui):
     assert label.winfo_width() <= label.master.winfo_width(), (
         f"{ui.window.send_code!r} overflows its card"
     )
+
+
+def test_a_finished_send_does_not_reuse_its_code_phrase(ui):
+    # The phrase is the encryption key: reusing it would let anyone who
+    # learned it from one transfer read the next.
+    from nowertransfer.transfer import EventType, TransferEvent
+
+    view = ui.open("send")
+    used = ui.window.send_code
+    view.on_transfer_event(TransferEvent(EventType.FINISHED))
+    settle(ui.window)
+
+    assert ui.window.send_code != used
+
+
+def test_a_send_that_cannot_start_leaves_no_resume_behind(ui, tmp_path):
+    from nowertransfer import session
+
+    view = ui.open("send", configured=False)
+    ui.window.send_paths = [tmp_path]
+    view.start_transfer()
+    settle(ui.window)
+
+    assert session.load_send_session() is None
 
 
 def test_the_code_on_screen_is_the_one_that_will_be_sent(ui):

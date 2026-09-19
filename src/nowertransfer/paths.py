@@ -86,8 +86,10 @@ def write_atomic(path: Path, text: str, *, private: bool = False) -> None:
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
-    temporary.touch(mode=0o600 if private else 0o666, exist_ok=True)
     if private:
+        # Created restricted before anything is written to it; touch()
+        # only applies the mode when it creates the file, hence chmod.
+        temporary.touch(mode=0o600, exist_ok=True)
         with suppress(OSError, NotImplementedError):
             temporary.chmod(0o600)
     temporary.write_text(text, encoding="utf-8")

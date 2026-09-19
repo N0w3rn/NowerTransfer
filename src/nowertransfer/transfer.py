@@ -27,18 +27,22 @@ RETRY_DELAY_SECONDS = 15
 #: does not look like a misconfiguration, few because these do not heal.
 _RELAY_ERROR_LIMIT = 3
 
-#: "Your settings are wrong", as opposed to "the peer is not here yet".
-_CONFIG_ERROR_MARKERS = (
-    "could not connect",
+#: The relay rejected our password. Never the code phrase: a wrong code
+#: phrase puts you in a different PAKE room, where croc simply waits.
+_RELAY_PASSWORD_MARKERS = (
     "bad password",
     "wrong password",
     "incorrect password",
 )
 
+#: "Your settings are wrong", as opposed to "the peer is not here yet".
+_CONFIG_ERROR_MARKERS = ("could not connect", *_RELAY_PASSWORD_MARKERS)
+
 _PROGRESS_PATTERN = re.compile(r"(\d{1,3})%")
 _LINE_SEPARATORS = re.compile(rb"[\r\n]")
 
 ERROR_RELAY_UNREACHABLE = "error.relay_unreachable"
+ERROR_RELAY_PASSWORD = "error.relay_password"
 ERROR_CROC_START_FAILED = "error.croc_start_failed"
 ERROR_VERSION_MISMATCH = "error.version_mismatch"
 
@@ -92,6 +96,12 @@ def looks_like_config_error(line: str) -> bool:
     """True if croc is complaining about the relay rather than the peer."""
     lowered = line.lower()
     return any(marker in lowered for marker in _CONFIG_ERROR_MARKERS)
+
+
+def looks_like_wrong_relay_password(line: str) -> bool:
+    """True if the relay refused our password."""
+    lowered = line.lower()
+    return any(marker in lowered for marker in _RELAY_PASSWORD_MARKERS)
 
 
 def looks_like_version_mismatch(line: str) -> bool:
@@ -179,9 +189,6 @@ class TransferWorker:
             with suppress(OSError):
                 process.terminate()
 
-    def is_running(self) -> bool:
-        return self._thread is not None and self._thread.is_alive()
-
     # -- internals -----------------------------------------------------
     def _environment(self, code: str, *, public: bool = False) -> dict[str, str]:
         """croc configuration, passed out of band.
@@ -258,7 +265,9 @@ class TransferWorker:
                         continue
                     self._emit(
                         EventType.FAILED,
-                        ERROR_RELAY_UNREACHABLE,
+                        ERROR_RELAY_PASSWORD
+                        if looks_like_wrong_relay_password(self._last_line)
+                        else ERROR_RELAY_UNREACHABLE,
                         detail=self._last_line,
                     )
                     return

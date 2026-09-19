@@ -107,6 +107,9 @@ class TransferScreen(View):
     starting croc; everything after the start button is identical.
     """
 
+    #: Retries before suggesting the code phrase might be the problem.
+    _RETRIES_BEFORE_CODE_HINT = 2
+
     def build_action_area(self, start_label: str) -> None:
         """The bottom half of a transfer screen: button, panel, back link.
 
@@ -117,6 +120,7 @@ class TransferScreen(View):
         self.back_button(side="bottom")
 
         self._start_label = start_label
+        self._retries = 0
         self.action = primary_button(
             self, start_label, self.accent, self._on_action_pressed
         )
@@ -163,7 +167,13 @@ class TransferScreen(View):
         if event.type is EventType.OUTPUT:
             self._on_output(event.text)
         elif event.type is EventType.RETRY:
-            self.panel.set_status(self.t("status.retry", seconds=event.seconds))
+            self._retries += 1
+            message = self.t("status.retry", seconds=event.seconds)
+            # Nothing coming back usually means the two sides are in
+            # different rooms, which croc never reports as an error.
+            if self._retries >= self._RETRIES_BEFORE_CODE_HINT:
+                message = f"{message} {self.t('status.check_code')}"
+            self.panel.set_status(message)
         elif event.type is EventType.FELL_BACK:
             # Opted into, but never silent.
             self.panel.set_status(self.t("status.fell_back"), error=True)
@@ -188,12 +198,12 @@ class TransferScreen(View):
             self.panel.set_status(message, error=True)
 
     def _on_output(self, line: str) -> None:
+        # croc's "bad password" is the *relay* password. A wrong code
+        # phrase produces no message at all - it just waits - so it is
+        # reported after repeated retries instead, see on_transfer_event.
         progress = parse_progress(line)
         if progress is not None:
             self.panel.set_progress(progress)
             self.panel.set_status(line)
             return
         self.panel.log(line)
-        lowered = line.lower()
-        if "wrong password" in lowered or "bad password" in lowered:
-            self.panel.set_status(self.t("status.wrong_code"), error=True)

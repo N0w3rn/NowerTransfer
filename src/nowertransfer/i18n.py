@@ -164,9 +164,9 @@ CATALOG: dict[str, dict[str, str]] = {
             "schickt nicht."
         ),
     },
-    "status.wrong_code": {
-        "en": "Wrong code phrase — please check it.",
-        "de": "Falsche Code-Phrase — bitte prüfen.",
+    "status.check_code": {
+        "en": "Still nothing — check that both sides use the same code phrase.",
+        "de": "Immer noch nichts — prüft, ob beide dieselbe Code-Phrase nutzen.",
     },
     # -- errors -------------------------------------------------------
     "error.relay_unreachable": {
@@ -178,6 +178,16 @@ CATALOG: dict[str, dict[str, str]] = {
             "Das Relay ist nicht erreichbar. Läuft es? Stimmen Adresse, Port "
             "und Relay-Passwort, und sind die Ports 9009–9013 in der Firewall "
             "offen?"
+        ),
+    },
+    "error.relay_password": {
+        "en": (
+            "The relay refused the password. This is the relay password, "
+            "not the code phrase — check it in the settings."
+        ),
+        "de": (
+            "Das Relay lehnt das Passwort ab. Gemeint ist das Relay-Passwort, "
+            "nicht die Code-Phrase — prüfe es in den Einstellungen."
         ),
     },
     "error.version_mismatch": {

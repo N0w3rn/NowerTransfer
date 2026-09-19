@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 import customtkinter as ctk
 
-from .theme import COLORS, GAP, PAD_CARD, Accent, font, mono
+from .theme import COLORS, PAD_CARD, Accent, font, mono
 
 
 class Card(ctk.CTkFrame):
@@ -179,34 +179,3 @@ class TransferPanel(ctk.CTkFrame):
         self._progress.stop()
         self._progress.configure(mode="determinate")
         self._progress.set(1.0 if completed else 0.0)
-
-
-def labelled_entry(
-    parent: ctk.CTkBaseClass,
-    caption: str,
-    hint: str,
-    *,
-    placeholder: str = "",
-    accent: str | None = None,
-    show: str | None = None,
-) -> tuple[Card, ctk.CTkEntry]:
-    """A card holding one captioned entry field with an explanatory hint."""
-    card = Card(parent, accent=accent)
-    card.caption(caption)
-    entry = ctk.CTkEntry(
-        card,
-        font=font(14),
-        height=38,
-        fg_color=COLORS.background,
-        border_color=accent or COLORS.panel_hover,
-        text_color=COLORS.text,
-        placeholder_text=placeholder,
-        show=show or "",
-    )
-    entry.pack(fill="x", padx=PAD_CARD, pady=(4, 0))
-    card.hint(hint)
-    return card, entry
-
-
-def spacer(parent: ctk.CTkBaseClass, height: int = GAP) -> None:
-    ctk.CTkFrame(parent, fg_color="transparent", height=height).pack(fill="x")

@@ -125,6 +125,12 @@ class MainWindow(ctk.CTk):
         self.settings = load_settings()
         self.t = Translator(self.settings.language)
 
+    def set_download_dir(self, folder: Path) -> None:
+        """Remember where received files go, across restarts."""
+        self.receive_dir = folder
+        self.settings.download_dir = str(folder)
+        save_settings(self.settings)
+
     def set_language(self, language: str) -> None:
         if language == self.t.language:
             return

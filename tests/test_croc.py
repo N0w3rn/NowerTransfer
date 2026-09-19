@@ -2,8 +2,8 @@ from nowertransfer import croc
 
 
 def test_the_bundled_binary_is_preferred():
-    # Its checksum was verified at build time; a binary next to the .exe
-    # is whoever could write to that directory.
+    # Its checksum was verified at build time. A binary next to the .exe
+    # is whatever anyone who can write to that directory put there.
     order = list(croc.candidate_paths())
     from nowertransfer.paths import bundle_dir, executable_dir
 

@@ -120,14 +120,19 @@ class SendView(TransferScreen):
         if not self.window.send_paths:
             self.panel.set_status(self.t("send.need_selection"), error=True)
             return
-        save_send_session(
-            self.window.send_code, [str(p) for p in self.window.send_paths]
-        )
         if not self.window.start_send(self.window.send_paths, self.window.send_code):
             self.panel.set_status(self.t("error.no_relay"), error=True)
             return
+        # Only once it is actually running: a session saved for a
+        # transfer that never started offers a resume for nothing.
+        save_send_session(
+            self.window.send_code, [str(p) for p in self.window.send_paths]
+        )
         self.enter_running()
         self.panel.set_status(self.t("send.connecting"))
 
     def on_finished(self) -> None:
         clear_send_session()
+        # The phrase is the encryption key, so the next transfer gets a
+        # new one rather than reusing one that has already been shared.
+        self.window.send_code = generate_code()
