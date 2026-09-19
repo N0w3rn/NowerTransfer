@@ -7,7 +7,7 @@ import customtkinter as ctk
 from ... import __version__
 from ...config import RelayMode
 from ...session import load_send_session
-from ..theme import COLORS, RECEIVE_ACCENT, SEND_ACCENT, Accent, font
+from ..theme import COLORS, GOLD_ACCENT, font
 from ..widgets import Card, link_button, primary_button
 from .base import View
 
@@ -21,11 +21,11 @@ class HomeView(View):
                 self.t("croc.missing.title"), self.t("croc.missing.body"), COLORS.error
             )
         elif not self.window.settings.is_configured:
-            self._blocker(self.t("setup.title"), self.t("setup.body"), COLORS.receive)
+            self._blocker(self.t("setup.title"), self.t("setup.body"), COLORS.gold)
             primary_button(
                 self,
                 self.t("nav.settings"),
-                RECEIVE_ACCENT,
+                GOLD_ACCENT,
                 self.window.show_settings,
             ).pack(fill="x", pady=(14, 0))
         else:
@@ -41,26 +41,23 @@ class HomeView(View):
         row.grid_columnconfigure((0, 1), weight=1, uniform="roles")
         row.grid_rowconfigure(0, weight=1)
 
-        roles: list[tuple[str, str, Accent, object]] = [
-            ("home.send.title", "home.send.body", SEND_ACCENT, self.window.show_send),
-            (
-                "home.receive.title",
-                "home.receive.body",
-                RECEIVE_ACCENT,
-                self.window.show_receive,
-            ),
+        # The arrow carries the direction. The palette is one accent, so
+        # it cannot do that job the way two colours used to.
+        roles: list[tuple[str, str, str, object]] = [
+            ("▲", "home.send.title", "home.send.body", self.window.show_send),
+            ("▼", "home.receive.title", "home.receive.body", self.window.show_receive),
         ]
-        for column, (title, body, accent, command) in enumerate(roles):
+        for column, (arrow, title, body, command) in enumerate(roles):
             ctk.CTkButton(
                 row,
-                text=f"{self.t(title)}\n\n{self.t(body)}",
+                text=f"{arrow}\n\n{self.t(title)}\n\n{self.t(body)}",
                 font=font(16, bold=True),
                 fg_color=COLORS.panel,
                 hover_color=COLORS.panel_hover,
-                text_color=accent.color,
+                text_color=GOLD_ACCENT.color,
                 corner_radius=14,
                 border_width=2,
-                border_color=accent.color,
+                border_color=GOLD_ACCENT.color,
                 command=command,
             ).grid(
                 row=0,

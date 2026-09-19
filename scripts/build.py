@@ -113,7 +113,10 @@ def pyinstaller_command(croc: Path, relay_file: Path | None) -> list[str]:
     if relay_file is not None:
         command += ["--add-data", f"{relay_file}{separator}."]
     if ICON_PATH.exists():
+        # --icon sets the .exe's own icon; the running window loads the
+        # bundled copy itself, so it has to be packed in as well.
         command += ["--icon", str(ICON_PATH)]
+        command += ["--add-data", f"{ICON_PATH}{separator}."]
     command.append(str(PROJECT_ROOT / "scripts" / "entrypoint.py"))
     return command
 

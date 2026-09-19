@@ -1,9 +1,12 @@
 """Colours, fonts and spacing.
 
-One idea carries the whole design: the accent colour encodes the direction
-of the transfer. Green means data leaving this machine, blue means data
-arriving. Every screen inherits its accent from the role it serves, so the
-user can tell send from receive without reading a word.
+The palette is the logo's: gold on a near-black indigo. Both key colours
+are sampled from the mark itself rather than approximated, so the app and
+the icon in the taskbar look like the same product.
+
+Gold is the only accent. An earlier version used green for sending and
+blue for receiving, which a two-colour brand has no room for, so the two
+directions are told apart by the arrow on their cards instead.
 """
 
 from __future__ import annotations
@@ -14,20 +17,20 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Palette:
-    background: str = "#0F1419"
-    panel: str = "#1A222B"
-    panel_hover: str = "#232E39"
-    panel_active: str = "#2C3945"
-    text: str = "#E9EEF3"
-    muted: str = "#8595A5"
-    send: str = "#2EBD85"
-    send_hover: str = "#249668"
-    send_ink: str = "#06281B"
-    receive: str = "#4D9DE0"
-    receive_hover: str = "#3B7FB8"
-    receive_ink: str = "#0A1D2E"
-    error: str = "#E0604D"
-    error_hover: str = "#3A2A28"
+    # Sampled from the logo: #07021A is its darkest body colour, #F8C715
+    # its gold. The rest of the scale is built up from those two.
+    background: str = "#0A0518"
+    panel: str = "#150F2B"
+    panel_hover: str = "#201938"
+    panel_active: str = "#2C2448"
+    text: str = "#F3EFFA"
+    muted: str = "#9086A8"
+    gold: str = "#F8C715"
+    gold_hover: str = "#D8AA0B"
+    gold_soft: str = "#F5D560"
+    ink: str = "#0A0518"
+    error: str = "#FF6B5A"
+    error_hover: str = "#3A1F2A"
 
 
 COLORS = Palette()
@@ -35,16 +38,20 @@ COLORS = Palette()
 
 @dataclass(frozen=True)
 class Accent:
-    """The colour set belonging to one role."""
+    """A colour and the two shades that go with it."""
 
     color: str
     hover: str
+    #: Colour for text drawn *on* ``color``.
     ink: str
 
 
-SEND_ACCENT = Accent(COLORS.send, COLORS.send_hover, COLORS.send_ink)
-RECEIVE_ACCENT = Accent(COLORS.receive, COLORS.receive_hover, COLORS.receive_ink)
+GOLD_ACCENT = Accent(COLORS.gold, COLORS.gold_hover, COLORS.ink)
 NEUTRAL_ACCENT = Accent(COLORS.muted, COLORS.panel_hover, COLORS.text)
+
+#: Both directions share the brand accent; see the module docstring.
+SEND_ACCENT = GOLD_ACCENT
+RECEIVE_ACCENT = GOLD_ACCENT
 
 
 def _family(windows: str, macos: str, other: str) -> str:

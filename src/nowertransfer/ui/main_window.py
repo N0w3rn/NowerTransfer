@@ -7,7 +7,9 @@ code phrase, the running worker - lives here.
 
 from __future__ import annotations
 
+import tkinter as tk
 from collections.abc import Callable, Sequence
+from contextlib import suppress
 from pathlib import Path
 from queue import Empty, Queue
 
@@ -18,6 +20,7 @@ from ..codes import generate_code
 from ..config import Settings, load_settings, save_settings
 from ..croc import find_croc
 from ..i18n import Translator
+from ..paths import icon_path
 from ..session import SendSession
 from ..transfer import EventType, TransferEvent, TransferWorker
 from .theme import COLORS, PAD_WINDOW
@@ -58,12 +61,26 @@ class MainWindow(ctk.CTk):
         self.minsize(580, 540)
         self.configure(fg_color=COLORS.background)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self._apply_icon()
 
         self.content = ctk.CTkFrame(self, fg_color=COLORS.background)
         self.content.pack(fill="both", expand=True, padx=PAD_WINDOW, pady=20)
 
         self.show_home()
         self._poll_job = self.after(POLL_INTERVAL_MS, self._drain_events)
+
+    def _apply_icon(self) -> None:
+        """Put the logo in the title bar and the taskbar.
+
+        PyInstaller's --icon only covers the .exe file itself; the running
+        window needs this. Purely cosmetic, so a platform that cannot do
+        it (tkinter wants .xbm outside Windows) is not worth an error.
+        """
+        icon = icon_path()
+        if icon is None:
+            return
+        with suppress(tk.TclError):
+            self.iconbitmap(str(icon))
 
     # ------------------------------------------------------------------
     #  Navigation

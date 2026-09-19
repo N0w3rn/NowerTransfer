@@ -14,7 +14,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from ...config import RelayMode, save_settings, with_relay
-from ..theme import COLORS, NEUTRAL_ACCENT, PAD_CARD, RECEIVE_ACCENT, font
+from ..theme import COLORS, GAP, GOLD_ACCENT, NEUTRAL_ACCENT, PAD_CARD, font
 from ..widgets import Card, primary_button
 from .base import View
 
@@ -39,7 +39,7 @@ class SettingsView(View):
             anchor="w",
         )
         self._message.pack(side="bottom", fill="x", pady=(6, 0))
-        primary_button(self, self.t("settings.save"), RECEIVE_ACCENT, self._save).pack(
+        primary_button(self, self.t("settings.save"), GOLD_ACCENT, self._save).pack(
             side="bottom", fill="x", pady=(8, 0)
         )
 
@@ -70,7 +70,7 @@ class SettingsView(View):
 
     def _mode_card(self) -> None:
         card = Card(self._body)
-        card.pack(fill="x")
+        card.pack(fill="x", pady=(0, GAP))
         card.caption(self.t("settings.relay_mode"))
         row = card.row(pady=(4, 0))
 
@@ -119,7 +119,7 @@ class SettingsView(View):
         settings = self.window.settings
 
         card = Card(self._body)
-        card.pack(fill="x")
+        card.pack(fill="x", pady=(0, GAP))
         card.caption(self.t("settings.relay_host"))
         self._host_entry = ctk.CTkEntry(
             card,
@@ -137,7 +137,7 @@ class SettingsView(View):
         )
 
         password_card = Card(self._body)
-        password_card.pack(fill="x", pady=12)
+        password_card.pack(fill="x", pady=(0, GAP))
         password_card.caption(self.t("settings.relay_password"))
         row = password_card.row(pady=(4, 0))
         self._password_entry = ctk.CTkEntry(
@@ -163,8 +163,8 @@ class SettingsView(View):
             width=90,
             checkbox_width=18,
             checkbox_height=18,
-            fg_color=COLORS.receive,
-            hover_color=COLORS.receive_hover,
+            fg_color=COLORS.gold,
+            hover_color=COLORS.gold_hover,
             command=self._toggle_password,
         )
         self._reveal.pack(side="left", padx=(10, 0))

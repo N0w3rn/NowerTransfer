@@ -1,3 +1,5 @@
+<img src="assets/logo.png" alt="" width="104" align="right">
+
 # NowerTransfer
 
 Send a file to someone through **your own relay**. One window, two buttons.
@@ -141,9 +143,10 @@ scripts/
   fetch_croc.py downloads croc from its GitHub releases
 ```
 
-No secrets and no binaries are committed: `croc` is fetched at build time,
-pinned to one release in `scripts/fetch_croc.py` and verified against the
-SHA-256 that release publishes.
+No secrets are committed, and no third-party binaries: `croc` is fetched
+at build time, pinned to one release in `scripts/fetch_croc.py` and
+verified against the SHA-256 that release publishes. (`assets/` holds the
+app's own icon, which is source, not a dependency.)
 
 **Both sides of a transfer need the same croc major version.** croc 11
 changed its PAKE handshake and refuses croc 10 peers outright, so when the

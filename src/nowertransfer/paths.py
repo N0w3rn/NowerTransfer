@@ -59,6 +59,17 @@ def user_config_dir() -> Path:
     return base / APP_NAME
 
 
+ICON_NAME = "icon.ico"
+
+
+def icon_path() -> Path | None:
+    """The window icon, bundled into a build or read from ``assets/``."""
+    for candidate in (bundle_dir() / ICON_NAME, project_root() / "assets" / ICON_NAME):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def default_download_dir() -> Path:
     """Where received files land unless the user picks somewhere else."""
     downloads = Path.home() / "Downloads"
