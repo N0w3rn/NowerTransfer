@@ -96,7 +96,10 @@ class MainWindow(ctk.CTk):
 
     def _rebuild(self) -> None:
         """Redraw the current screen, e.g. after the language changed."""
-        self._show(self._view_factory, **self._view_options)
+        options = dict(self._view_options)
+        if self._view is not None:
+            options.update(self._view.capture_state())
+        self._show(self._view_factory, **options)
 
     # ------------------------------------------------------------------
     #  Settings

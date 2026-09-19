@@ -23,7 +23,7 @@ class SettingsView(View):
     accent = NEUTRAL_ACCENT
 
     def build(self) -> None:
-        self.header(self.t("settings.title"))
+        self.header(self.t("settings.title"), with_language=True)
 
         # Everything that must stay reachable is packed against the
         # bottom first. Packed last, a long translation or a small window
@@ -89,9 +89,24 @@ class SettingsView(View):
             unselected_hover_color=COLORS.panel_hover,
             text_color=COLORS.text,
         )
-        self._mode.set(self._mode_labels[self.window.settings.mode])
+        current = RelayMode.parse(
+            self._draft("draft_mode", self.window.settings.relay_mode)
+        )
+        self._mode.set(self._mode_labels[current])
         self._mode.pack(side="left", fill="x", expand=True)
         card.hint(self.t("settings.relay_mode_hint"))
+
+    def capture_state(self) -> dict[str, object]:
+        return {
+            "draft_host": self._host_entry.get(),
+            "draft_password": self._password_entry.get(),
+            "draft_mode": self._selected_mode().value,
+        }
+
+    def _draft(self, key: str, stored: str) -> str:
+        """What to show in a field: an unsaved edit if there is one."""
+        value = self.options.get(key)
+        return value if isinstance(value, str) else stored
 
     def _selected_mode(self) -> RelayMode:
         chosen = self._mode.get()
@@ -115,7 +130,7 @@ class SettingsView(View):
             text_color=COLORS.text,
             placeholder_text=self.t("settings.relay_host_placeholder"),
         )
-        self._host_entry.insert(0, settings.relay_host)
+        self._host_entry.insert(0, self._draft("draft_host", settings.relay_host))
         self._host_entry.pack(fill="x", padx=PAD_CARD, pady=(4, 0))
         card.hint(
             f"{self.t('settings.relay_host_hint')}  ({self._source_text('relay_host')})"
@@ -135,7 +150,9 @@ class SettingsView(View):
             placeholder_text=self.t("settings.relay_password_placeholder"),
             show="•",
         )
-        self._password_entry.insert(0, settings.relay_password)
+        self._password_entry.insert(
+            0, self._draft("draft_password", settings.relay_password)
+        )
         self._password_entry.pack(side="left", fill="x", expand=True)
 
         self._reveal = ctk.CTkCheckBox(

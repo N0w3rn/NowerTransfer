@@ -44,6 +44,14 @@ class View(ctk.CTkFrame):
     def on_leave(self) -> None:
         """Called before the screen is destroyed."""
 
+    def capture_state(self) -> dict[str, object]:
+        """Values to carry across a redraw of this same screen.
+
+        Switching language rebuilds the current view; anything the user
+        has typed but not saved would otherwise be thrown away.
+        """
+        return {}
+
     # -- helpers -------------------------------------------------------
     def header(self, subtitle: str, *, with_language: bool = False) -> None:
         bar = ctk.CTkFrame(self, fg_color="transparent")
