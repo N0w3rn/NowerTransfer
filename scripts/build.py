@@ -41,7 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fetch_croc import binary_name
 from fetch_croc import main as fetch_croc_main
-from nowertransfer import FALLBACK_VERSION, VERSION_STAMP
+from nowertransfer import UNKNOWN_LABEL, VERSION, VERSION_STAMP
 from nowertransfer.config import dump_toml, normalise_relay_host
 from nowertransfer.envfile import read_env_file
 
@@ -95,6 +95,10 @@ def resolve_app_version(explicit: str | None) -> str | None:
     it claim to be the release. It gets the committed version with the
     commit appended - `1.0.0+bf5f5f9.dirty` - which reads as a version
     rather than as a bare hash in the window footer.
+
+    Returning None means no stamp, and the app will report itself as
+    unknown. That only happens without git, e.g. building from a
+    downloaded zip; pass --app-version to say what it is.
     """
     if explicit:
         return explicit.lstrip("vV")
@@ -111,7 +115,7 @@ def resolve_app_version(explicit: str | None) -> str | None:
     if not commit:
         return None
     suffix = ".dirty" if _git("status", "--porcelain") else ""
-    return f"{FALLBACK_VERSION}+{commit}{suffix}"
+    return f"{VERSION}+{commit}{suffix}"
 
 
 def ensure_croc(tag: str | None, skip: bool) -> Path:
@@ -227,7 +231,10 @@ def main(argv: list[str] | None = None) -> int:
             version_file.write_text(version, encoding="utf-8")
             print(f"version: {version}")
         else:
-            print(f"version: {FALLBACK_VERSION} (no tag found)")
+            print(
+                f"version: {UNKNOWN_LABEL} - no git here to identify the "
+                f"build. Pass --app-version {VERSION} to label it."
+            )
 
         command = pyinstaller_command(croc, relay_file, version_file)
         print("running:", " ".join(command))

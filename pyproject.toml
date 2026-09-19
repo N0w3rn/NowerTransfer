@@ -40,7 +40,7 @@ nowertransfer = "nowertransfer.app:main"
 
 [tool.hatch.version]
 path = "src/nowertransfer/__init__.py"
-pattern = 'FALLBACK_VERSION = "(?P<version>[^"]+)"'
+pattern = '^VERSION = "(?P<version>[^"]+)"'
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nowertransfer"]

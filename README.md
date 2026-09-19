@@ -106,10 +106,18 @@ the window footer is the one someone downloaded:
 git tag v1.1.0 && git push --tags
 ```
 
-`FALLBACK_VERSION` in `src/nowertransfer/__init__.py` is the single place
-the version is written — `pyproject.toml` reads that same line. A build
-made outside a tag says so: `1.0.0+bf5f5f9.dirty` rather than claiming to
-be the release.
+`VERSION` in `src/nowertransfer/__init__.py` is the single place the
+version is written — `pyproject.toml` reads that same line. Nothing ever
+claims to be a release it is not:
+
+| Where it runs | Shows |
+|---|---|
+| from source | `1.0.0-dev` |
+| tagged release build | `1.1.0` |
+| local `poe build` | `1.0.0+bf5f5f9.dirty` |
+| built without git, e.g. from a zip | `unknown` |
+
+Pass `poe build --app-version 1.0.0` to label a build yourself.
 
 ---
 
