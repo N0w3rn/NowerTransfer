@@ -7,7 +7,7 @@ import nowertransfer
 
 def test_a_source_checkout_marks_itself_as_such(monkeypatch):
     monkeypatch.delattr(sys, "_MEIPASS", raising=False)
-    assert nowertransfer.resolve_version() == f"{nowertransfer.VERSION}-dev"
+    assert nowertransfer.resolve_version() == nowertransfer.DEV_LABEL
 
 
 def test_a_build_reports_the_tag_it_was_made_from(tmp_path, monkeypatch):

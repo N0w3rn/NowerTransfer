@@ -10,9 +10,13 @@ APP_NAME = "NowerTransfer"
 #: made from over it, see :func:`resolve_version`.
 VERSION = "1.0.0"
 
-#: Shown by a build that carries no stamp at all. That should not happen
-#: for anything released, so it is better to say so than to quietly
-#: display a number the binary cannot actually vouch for.
+#: Shown when running from source, where there is nothing to stamp and
+#: the working tree is whatever it currently is.
+DEV_LABEL = "dev"
+
+#: Shown by a build that carries no stamp at all. The build script
+#: refuses to produce one, so this means a bundle was assembled by other
+#: means - better to say so than to display a number it cannot vouch for.
 UNKNOWN_LABEL = "unknown"
 
 #: Filename ``scripts/build.py`` writes into the bundle.
@@ -24,17 +28,15 @@ def resolve_version() -> str:
 
     Three cases, each said plainly:
 
-    * running from source - ``1.0.0-dev``, because the working tree is
-      whatever it currently is,
-    * a build - the tag or commit ``scripts/build.py`` stamped in,
-    * a build with no stamp - ``unknown``. Only happens when the sources
-      were built without git present, e.g. from a downloaded zip, and a
-      binary that cannot identify itself should not claim a release
-      number.
+    * running from source - ``dev``, because there is no build and the
+      working tree is whatever it currently is,
+    * a build - the version it was built with, which is mandatory,
+    * a bundle with no stamp - ``unknown``. A binary that cannot
+      identify itself should not claim a release number.
     """
     bundle = getattr(sys, "_MEIPASS", None)
     if not bundle:
-        return f"{VERSION}-dev"
+        return DEV_LABEL
     try:
         stamped = (Path(bundle) / VERSION_STAMP).read_text(encoding="utf-8").strip()
     except OSError:
@@ -46,6 +48,7 @@ __version__ = resolve_version()
 
 __all__ = [
     "APP_NAME",
+    "DEV_LABEL",
     "UNKNOWN_LABEL",
     "VERSION",
     "VERSION_STAMP",

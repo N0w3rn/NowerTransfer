@@ -6,20 +6,26 @@ repository. Configure your relay once and the resulting binary is the whole
 product: the person you hand it to double-clicks it and sends a file, with
 nothing to configure.
 
-Normally the values come from ``.env`` in the repository root (copy
-``.env.example``), so a plain ``poe build`` is enough. They can also be
-given on the command line or through the environment:
+Every build states the version it identifies itself as:
 
-    poe build --relay relay.example.com --relay-password hunter2
+    poe build 1.0.0
+
+Relay settings normally come from ``.env`` in the repository root (copy
+``.env.example``). They can also be given on the command line or through
+the environment:
+
+    poe build 1.0.0 --relay relay.example.com --relay-password hunter2
 
 Building without any of them produces a binary that asks the user for the
-relay on first start - which is what a public release should do.
+relay on first start - which is what a public release should do. A
+tagged release gets its version from the tag and needs no argument.
 """
 
 from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -41,7 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fetch_croc import binary_name
 from fetch_croc import main as fetch_croc_main
-from nowertransfer import UNKNOWN_LABEL, VERSION, VERSION_STAMP
+from nowertransfer import VERSION, VERSION_STAMP
 from nowertransfer.config import dump_toml, normalise_relay_host
 from nowertransfer.envfile import read_env_file
 
@@ -69,53 +75,43 @@ def resolve_relay(args: argparse.Namespace) -> dict[str, str]:
     return baked
 
 
-def _git(*args: str) -> str | None:
-    """Run a git command, or return None if git cannot answer."""
-    try:
-        result = subprocess.run(
-            ["git", *args],
-            cwd=PROJECT_ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=10,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return result.stdout.strip() if result.returncode == 0 else None
+#: MAJOR.MINOR.PATCH, optionally marked: 1.0.0, 1.0.0-rc1, 1.0.0+test.
+VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z][0-9A-Za-z.\-+]*)?$")
+
+VERSION_HELP = (
+    "Give the version this build should identify itself as:\n"
+    "    poe build 1.0.0\n"
+    "\n"
+    "Format: MAJOR.MINOR.PATCH, optionally marked, e.g. 1.0.0, 1.2.3,\n"
+    "1.0.0-rc1, 1.0.0-test. A leading v is accepted and dropped.\n"
+    "\n"
+    f"The current source version is {VERSION} (see VERSION in\n"
+    "src/nowertransfer/__init__.py). Tagged releases take the version\n"
+    "from the tag automatically and need no argument."
+)
 
 
-def resolve_app_version(explicit: str | None) -> str | None:
-    """The version to stamp into the build, or ``None`` to leave it alone.
+def resolve_app_version(explicit: str | None) -> str:
+    """The version to stamp in. Mandatory - there is no guessing.
 
-    A tagged release is the authoritative case: GitHub Actions puts the
-    tag in GITHUB_REF_NAME, so `v1.2.0` becomes `1.2.0`.
-
-    Anything else is somebody's local build, and saying so beats letting
-    it claim to be the release. It gets the committed version with the
-    commit appended - `1.0.0+bf5f5f9.dirty` - which reads as a version
-    rather than as a bare hash in the window footer.
-
-    Returning None means no stamp, and the app will report itself as
-    unknown. That only happens without git, e.g. building from a
-    downloaded zip; pass --app-version to say what it is.
+    A release is the one case that fills this in by itself: GitHub
+    Actions puts the tag in GITHUB_REF_NAME, so pushing `v1.2.0` builds
+    `1.2.0`. Every other build has to say what it is, because a binary
+    that quietly invents a number is one nobody can support.
     """
-    if explicit:
-        return explicit.lstrip("vV")
+    candidate = explicit
+    if not candidate:
+        ref = os.environ.get("GITHUB_REF_NAME", "")
+        if ref[:1] in "vV" and ref[1:2].isdigit():
+            candidate = ref
 
-    ref = os.environ.get("GITHUB_REF_NAME", "")
-    if ref[:1] in "vV" and ref[1:2].isdigit():
-        return ref.lstrip("vV")
+    if not candidate:
+        raise SystemExit(f"error: no version given.\n\n{VERSION_HELP}")
 
-    tag = _git("describe", "--tags", "--exact-match")
-    if tag:
-        return tag.lstrip("vV")
-
-    commit = _git("rev-parse", "--short", "HEAD")
-    if not commit:
-        return None
-    suffix = ".dirty" if _git("status", "--porcelain") else ""
-    return f"{VERSION}+{commit}{suffix}"
+    candidate = candidate.lstrip("vV")
+    if not VERSION_PATTERN.match(candidate):
+        raise SystemExit(f"error: {candidate!r} is not a version.\n\n{VERSION_HELP}")
+    return candidate
 
 
 def ensure_croc(tag: str | None, skip: bool) -> Path:
@@ -186,17 +182,23 @@ def main(argv: list[str] | None = None) -> int:
         "--relay-password",
         help="relay password (omit to use croc's default)",
     )
-    parser.add_argument("--croc-tag", help="pin a croc release, e.g. v11.5.3")
     parser.add_argument(
-        "--app-version",
-        help="version to stamp in (default: the release tag, else git describe)",
+        "version",
+        nargs="?",
+        help="version this build identifies itself as, e.g. 1.0.0 "
+        "(omit only in the release workflow, which takes the git tag)",
     )
+    parser.add_argument("--croc-tag", help="pin a croc release, e.g. v11.5.3")
     parser.add_argument(
         "--no-fetch",
         action="store_true",
         help="fail instead of downloading croc",
     )
     args = parser.parse_args(argv)
+
+    # Resolved first: no point downloading croc for a build that is
+    # going to be rejected for having no version.
+    version = resolve_app_version(args.version)
 
     if shutil.which("pyinstaller") is None:
         try:
@@ -224,17 +226,9 @@ def main(argv: list[str] | None = None) -> int:
                 "first start (see --help)"
             )
 
-        version_file: Path | None = None
-        version = resolve_app_version(args.app_version)
-        if version:
-            version_file = Path(staging) / VERSION_STAMP
-            version_file.write_text(version, encoding="utf-8")
-            print(f"version: {version}")
-        else:
-            print(
-                f"version: {UNKNOWN_LABEL} - no git here to identify the "
-                f"build. Pass --app-version {VERSION} to label it."
-            )
+        version_file = Path(staging) / VERSION_STAMP
+        version_file.write_text(version, encoding="utf-8")
+        print(f"version: {version}")
 
         command = pyinstaller_command(croc, relay_file, version_file)
         print("running:", " ".join(command))

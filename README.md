@@ -37,7 +37,7 @@ The password is optional; drop `--pass` and croc's default applies.
 
 ```bash
 cp .env.example .env        # RELAY_HOST and RELAY_PASSWORD go here
-poe build
+poe build 1.0.0             # the version this build calls itself
 ```
 
 **3. Hand out `dist/NowerTransfer.exe`.** That's it.
@@ -99,25 +99,29 @@ poe build     # build dist/NowerTransfer.exe
 
 ### Versioning
 
-Push a tag and the release build stamps itself with it, so the number in
-the window footer is the one someone downloaded:
+**Every build states its version** — `poe build 1.0.0`. Leave it out and
+the build refuses, rather than inventing a number nobody can match to a
+binary later. Format is `MAJOR.MINOR.PATCH`, optionally marked
+(`1.0.0-rc1`, `1.0.0-test`).
+
+The exception is a release, which takes the version from the tag:
 
 ```bash
-git tag v1.1.0 && git push --tags
+git tag v1.1.0 && git push --tags     # builds and publishes 1.1.0
 ```
 
-`VERSION` in `src/nowertransfer/__init__.py` is the single place the
-version is written — `pyproject.toml` reads that same line. Nothing ever
-claims to be a release it is not:
+So the number in the window footer is always the one someone actually
+downloaded:
 
 | Where it runs | Shows |
 |---|---|
-| from source | `1.0.0-dev` |
-| tagged release build | `1.1.0` |
-| local `poe build` | `1.0.0+bf5f5f9.dirty` |
-| built without git, e.g. from a zip | `unknown` |
+| from source (`poe app`) | `dev` |
+| tagged release | `1.1.0` |
+| `poe build 1.0.0-test` | `1.0.0-test` |
+| a bundle with no version stamped | `unknown` |
 
-Pass `poe build --app-version 1.0.0` to label a build yourself.
+`VERSION` in `src/nowertransfer/__init__.py` is the single place the
+source version is written — `pyproject.toml` reads that same line.
 
 ---
 

@@ -46,9 +46,11 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
-      # No relay is baked in here: there is no .env in CI, and a public
-      # build must not carry anyone's credentials.
-      - run: poe build
+      # This only checks that the build still works. No relay is baked
+      # in - there is no .env in CI, and a public build must not carry
+      # anyone's credentials - and the version says plainly that the
+      # artifact is a CI build, not a release.
+      - run: poe build 0.0.0-ci
       - uses: actions/upload-artifact@v5
         with:
           name: NowerTransfer-windows
