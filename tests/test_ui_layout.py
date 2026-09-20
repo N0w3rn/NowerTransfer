@@ -189,6 +189,17 @@ def test_no_screen_offers_two_ways_back(ui, screen):
     assert not duplicates, f"{screen} still has a second back button"
 
 
+def test_the_role_cards_sit_under_the_header(ui):
+    # They used to float in the middle of the window, because their
+    # row took the spare height. The header, the cards and the resume
+    # strip belong together at the top; the gap goes at the bottom.
+    view = ui.open("home")
+    header, cards = view.winfo_children()[0], view.winfo_children()[1]
+
+    gap = cards.winfo_y() - (header.winfo_y() + header.winfo_height())
+    assert 0 < gap < 40, f"{gap}px between the header and the cards"
+
+
 def test_the_first_run_screen_builds(ui):
     view = ui.open("home", configured=False)
     assert not ui.collapsed(view)

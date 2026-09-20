@@ -75,10 +75,13 @@ class HomeView(View):
             ctk.CTkLabel(parent, image=self._logo, text="").pack(side="left")
 
     def _role_cards(self) -> None:
+        # Not expand=True: the row would swallow the spare height and
+        # float the cards in the middle of the window. They belong
+        # under the header, with the resume strip under them; the
+        # spare space goes at the bottom, above the footer.
         row = ctk.CTkFrame(self, fg_color="transparent")
-        row.pack(fill="both", expand=True, pady=(26, 14))
+        row.pack(fill="x", pady=(22, 0))
         row.grid_columnconfigure((0, 1), weight=1, uniform="roles")
-        row.grid_rowconfigure(0, weight=1)
 
         roles = [
             ("upload", "home.send", self.window.show_send, True),
@@ -93,8 +96,7 @@ class HomeView(View):
                 border_width=1,
                 border_color=COLORS.gold if filled else COLORS.panel_active,
             )
-            # "ew", not "nsew": the cards keep their natural height and
-            # the spare room centres them instead of stretching them.
+            # "ew", not "nsew": the cards keep their natural height.
             card.grid(
                 row=0,
                 column=column,
