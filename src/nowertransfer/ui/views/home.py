@@ -80,6 +80,8 @@ class HomeView(View):
             ctk.CTkLabel(parent, image=self._logo, text="").pack(side="left")
 
     def _role_cards(self) -> None:
+        #: The card canvases, in Tab order.
+        self._focus_stops: list[ctk.CTkCanvas] = []
         # Not expand=True: the row would swallow the spare height and
         # float the cards in the middle of the window. They belong
         # under the header, with the resume strip under them; the
@@ -94,12 +96,13 @@ class HomeView(View):
         ]
         for column, (icon, key, command, filled) in enumerate(roles):
             title, body = f"{key}.title", f"{key}.body"
+            border = COLORS.gold if filled else COLORS.panel_active
             card = ctk.CTkFrame(
                 row,
                 fg_color=COLORS.panel,
                 corner_radius=RADIUS_LARGE,
                 border_width=1,
-                border_color=COLORS.gold if filled else COLORS.panel_active,
+                border_color=border,
             )
             # "ew", not "nsew": the cards keep their natural height.
             card.grid(
@@ -126,12 +129,48 @@ class HomeView(View):
             # whole card is made clickable instead - children included,
             # or the badge and labels would swallow the click.
             self._make_clickable(card, command)
+            self._make_reachable(card, command, resting=border)
 
     def _make_clickable(self, widget: ctk.CTkBaseClass, command) -> None:
         widget.bind("<Button-1>", lambda _event: command())
         widget.configure(cursor="hand2")
         for child in widget.winfo_children():
             self._make_clickable(child, command)
+
+    def _make_reachable(self, card: ctk.CTkFrame, command, *, resting: str) -> None:
+        """Let the card be reached with Tab and pressed with Enter.
+
+        A frame is not a focus stop, so before this the app could not
+        be driven from the keyboard at all: Tab reached only the
+        settings link in the footer, and neither role card could be
+        opened without a mouse. The canvas CustomTkinter draws the
+        card on can take focus, which is the piece that was missing.
+
+        That canvas is reached through ``_canvas`` because
+        CustomTkinter keeps it out of ``winfo_children`` - checked,
+        the frame reports only the widgets we put in it. Guarded, so
+        a future version that renames it costs the keyboard route
+        rather than the screen.
+        """
+        canvas = getattr(card, "_canvas", None)
+        if canvas is None:  # pragma: no cover - present in CustomTkinter 6
+            return
+
+        canvas.configure(takefocus=True)
+        # Windows reports the numpad's Enter as Return too, so the two
+        # keys here are the whole set.
+        for key in ("<Return>", "<space>"):
+            canvas.bind(key, lambda _event: command())
+        # Focus has to be visible or being able to reach it is no use.
+        canvas.bind(
+            "<FocusIn>",
+            lambda _event: card.configure(border_color=COLORS.gold, border_width=2),
+        )
+        canvas.bind(
+            "<FocusOut>",
+            lambda _event: card.configure(border_color=resting, border_width=1),
+        )
+        self._focus_stops.append(canvas)
 
     def _update_notice(self) -> None:
         """Say a newer release exists, once the check has found one.

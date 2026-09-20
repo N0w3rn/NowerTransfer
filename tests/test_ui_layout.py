@@ -304,6 +304,51 @@ def _descendants(widget):
         yield from _descendants(child)
 
 
+@pytest.mark.parametrize("key", ["<Return>", "<space>"])
+@pytest.mark.parametrize(("index", "expected"), [(0, "SendView"), (1, "ReceiveView")])
+def test_the_start_screen_can_be_driven_from_the_keyboard(ui, key, index, expected):
+    # Before this the app could not be used without a mouse at all:
+    # the role cards are frames, which are not focus stops, so Tab
+    # reached only the settings link in the footer.
+    view = ui.open("home")
+    stop = view._focus_stops[index]
+
+    stop.focus_set()
+    settle(ui.window)
+    stop.event_generate(key)
+    settle(ui.window)
+
+    assert type(ui.window._view).__name__ == expected
+
+
+def test_the_cards_are_focus_stops_in_reading_order(ui):
+    view = ui.open("home")
+    first, second = view._focus_stops
+
+    assert first.cget("takefocus")
+    assert second.cget("takefocus")
+    # Tab goes from one to the other rather than past them both.
+    assert first.tk_focusNext() is second
+
+
+def test_the_focused_card_looks_focused(ui):
+    # A focus stop nobody can see is no better than none at all.
+    from nowertransfer.ui.theme import COLORS
+
+    view = ui.open("home")
+    first, second = view._focus_stops
+
+    first.focus_set()
+    settle(ui.window)
+    assert first.master.cget("border_width") == 2
+    assert first.master.cget("border_color") == COLORS.gold
+
+    second.focus_set()
+    settle(ui.window)
+    assert first.master.cget("border_width") == 1, "the ring did not move"
+    assert second.master.cget("border_width") == 2
+
+
 def test_the_role_cards_sit_under_the_header(ui):
     # They used to float in the middle of the window, because their
     # row took the spare height. The header, the cards and the resume
