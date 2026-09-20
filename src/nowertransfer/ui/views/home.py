@@ -197,8 +197,16 @@ class HomeView(View):
             if settings.mode is RelayMode.PUBLIC
             else settings.relay.display_host()
         )
-        status = StatusDot(strip, self.t("relay.label"), COLORS.gold)
-        status.pack(side="left", padx=(16, 0), pady=11)
+        # The dot used to be gold whatever the relay was doing, which
+        # read as "all well" even when nothing was listening. Grey
+        # while the check runs or when there is no relay of ours to
+        # check, gold when it answered, red when it did not.
+        label, colour = {
+            None: (self.t("relay.label"), COLORS.faint),
+            True: (self.t("relay.label"), COLORS.gold),
+            False: (self.t("relay.unreachable"), COLORS.error),
+        }[self.window.relay_reachable]
+        StatusDot(strip, label, colour).pack(side="left", padx=(16, 0), pady=11)
         ctk.CTkLabel(strip, text=relay, font=mono(12), text_color=COLORS.text).pack(
             side="left", padx=(10, 0)
         )

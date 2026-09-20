@@ -22,6 +22,7 @@ from ..config import Settings, load_settings, save_settings
 from ..croc import find_croc
 from ..i18n import Translator
 from ..paths import icon_path
+from ..relaycheck import reach
 from ..session import SendSession
 from ..transfer import EventType, TransferEvent, TransferWorker
 from ..updates import Release, newer_than
@@ -35,6 +36,9 @@ POLL_INTERVAL_MS = 100
 
 #: The update check answers once or not at all, so this can be lazy.
 UPDATE_POLL_MS = 400
+
+#: The relay answers in milliseconds or times out in four seconds.
+RELAY_POLL_MS = 200
 
 _TERMINAL_EVENTS = frozenset(
     {EventType.FINISHED, EventType.CANCELLED, EventType.FAILED}
@@ -61,8 +65,13 @@ class MainWindow(ctk.CTk):
         self._running = False
         self._poll_job: str | None = None
         self._update_job: str | None = None
+        self._relay_job: str | None = None
         #: The newer release, once the background check has found one.
         self.newer_release: Release | None = None
+        #: Whether the relay answered a TCP connect. None while the
+        #: check is still running, or when there is no own relay to
+        #: check - the start screen shows all three differently.
+        self.relay_reachable: bool | None = None
         self._view: View | None = None
         self._view_factory: type[View] = HomeView
         self._view_options: dict[str, object] = {}
@@ -80,6 +89,7 @@ class MainWindow(ctk.CTk):
         self.open_first_screen(preselect)
         self._poll_job = self.after(POLL_INTERVAL_MS, self._drain_events)
         self._start_update_check()
+        self.start_relay_check()
 
     def _apply_icon(self) -> None:
         """Put the logo in the title bar and the taskbar.
@@ -155,6 +165,44 @@ class MainWindow(ctk.CTk):
             self._rebuild()
 
     # ------------------------------------------------------------------
+    #  Is the relay there?
+    # ------------------------------------------------------------------
+    def start_relay_check(self) -> None:
+        """Ask the relay whether it answers, so the dot can say so.
+
+        The start screen showed a gold dot whatever the state of the
+        relay, which is a claim the app had not checked. This is a TCP
+        connect and nothing more - it says the relay is listening, not
+        that the password is right. Nothing else can; see
+        :mod:`~nowertransfer.relaycheck`.
+        """
+        if self._relay_job is not None:
+            self.after_cancel(self._relay_job)
+            self._relay_job = None
+        self.relay_reachable = None
+
+        relay = self.settings.relay
+        if not relay.is_set:
+            return  # the public relay: no address of ours to test
+
+        answered: list[bool] = []
+        threading.Thread(
+            target=lambda: answered.append(reach(relay.host) is not None),
+            name="relay-reachability",
+            daemon=True,
+        ).start()
+        self._relay_job = self.after(RELAY_POLL_MS, self._collect_relay, answered)
+
+    def _collect_relay(self, answered: list[bool]) -> None:
+        if not answered:
+            self._relay_job = self.after(RELAY_POLL_MS, self._collect_relay, answered)
+            return
+        self._relay_job = None
+        self.relay_reachable = answered[0]
+        if isinstance(self._view, HomeView):
+            self._rebuild()
+
+    # ------------------------------------------------------------------
     #  Navigation
     # ------------------------------------------------------------------
     def show_home(self) -> None:
@@ -196,6 +244,9 @@ class MainWindow(ctk.CTk):
     def reload_settings(self) -> None:
         self.settings = load_settings()
         self.t = Translator(self.settings.language)
+        # The relay may be a different one now, so the old answer says
+        # nothing about it.
+        self.start_relay_check()
 
     def set_download_dir(self, folder: Path) -> None:
         """Remember where received files go, across restarts."""
@@ -268,8 +319,8 @@ class MainWindow(ctk.CTk):
     def destroy(self) -> None:
         # A callback firing after the widgets are gone raises out of
         # tkinter's event loop, where nothing catches it.
-        for job in (self._poll_job, self._update_job):
+        for job in (self._poll_job, self._update_job, self._relay_job):
             if job is not None:
                 self.after_cancel(job)
-        self._poll_job = self._update_job = None
+        self._poll_job = self._update_job = self._relay_job = None
         super().destroy()

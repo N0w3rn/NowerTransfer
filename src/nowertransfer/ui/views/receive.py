@@ -9,7 +9,7 @@ import customtkinter as ctk
 
 from ...codes import is_plausible_code
 from ...paths import open_in_file_manager
-from ..theme import COLORS, GAP, PAD_CARD, RADIUS, RECEIVE_ACCENT, font
+from ..theme import COLORS, GAP, PAD_CARD, RADIUS, RECEIVE_ACCENT, font, mono
 from ..widgets import caption, entry, hint, quiet_button
 from .base import TransferScreen
 
@@ -49,7 +49,8 @@ class ReceiveView(TransferScreen):
             texts,
             text=str(self.window.receive_dir),
             text_color=COLORS.text,
-            font=font(12),
+            # Same face as every other path and address in the app.
+            font=mono(11),
             anchor="w",
         )
         self._target_label.pack(anchor="w", pady=(4, 0))

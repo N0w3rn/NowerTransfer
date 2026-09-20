@@ -108,7 +108,9 @@ class SendView(TransferScreen):
             row,
             text=self._selection_text(),
             text_color=COLORS.muted,
-            font=font(12),
+            # A path is machine text, like the relay address and the
+            # code phrase, and belongs in the same face as those.
+            font=mono(11),
             wraplength=560,
             justify="left",
             anchor="w",

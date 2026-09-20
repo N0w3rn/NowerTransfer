@@ -274,6 +274,36 @@ def test_the_update_check_can_be_switched_off(ui, tmp_path, monkeypatch):
     assert config.load_settings().checks_for_updates is False
 
 
+@pytest.mark.parametrize(
+    ("reachable", "expect_gold"),
+    [(True, True), (False, False), (None, False)],
+)
+def test_the_relay_dot_says_what_the_relay_is_doing(ui, reachable, expect_gold):
+    # It used to be gold whatever the relay was doing, which reads as
+    # "all well" even when nothing is listening.
+    from nowertransfer.ui.theme import COLORS
+    from nowertransfer.ui.widgets import StatusDot
+
+    ui.window.relay_reachable = reachable
+    try:
+        view = ui.open("home")
+        dots = [child for child in _descendants(view) if isinstance(child, StatusDot)]
+        assert dots, "no relay dot on the screen"
+        colour = dots[0]._dot.cget("fg_color")
+    finally:
+        ui.window.relay_reachable = None
+
+    assert (colour == COLORS.gold) is expect_gold, colour
+    if reachable is False:
+        assert colour == COLORS.error
+
+
+def _descendants(widget):
+    for child in widget.winfo_children():
+        yield child
+        yield from _descendants(child)
+
+
 def test_the_role_cards_sit_under_the_header(ui):
     # They used to float in the middle of the window, because their
     # row took the spare height. The header, the cards and the resume
