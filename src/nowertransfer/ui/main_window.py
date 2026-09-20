@@ -7,6 +7,7 @@ code phrase, the running worker - lives here.
 
 from __future__ import annotations
 
+import threading
 import tkinter as tk
 from collections.abc import Callable, Sequence
 from contextlib import suppress
@@ -15,7 +16,7 @@ from queue import Empty, Queue
 
 import customtkinter as ctk
 
-from .. import APP_NAME
+from .. import APP_NAME, __version__
 from ..codes import generate_code
 from ..config import Settings, load_settings, save_settings
 from ..croc import find_croc
@@ -23,6 +24,7 @@ from ..i18n import Translator
 from ..paths import icon_path
 from ..session import SendSession
 from ..transfer import EventType, TransferEvent, TransferWorker
+from ..updates import Release, newer_than
 from . import winicon
 from .theme import COLORS, PAD_WINDOW
 from .views import HomeView, ReceiveView, SendView, SettingsView
@@ -30,6 +32,9 @@ from .views.base import View
 
 #: How often the UI thread checks the worker queue, in milliseconds.
 POLL_INTERVAL_MS = 100
+
+#: The update check answers once or not at all, so this can be lazy.
+UPDATE_POLL_MS = 400
 
 _TERMINAL_EVENTS = frozenset(
     {EventType.FINISHED, EventType.CANCELLED, EventType.FAILED}
@@ -55,6 +60,9 @@ class MainWindow(ctk.CTk):
         self._worker: TransferWorker | None = None
         self._running = False
         self._poll_job: str | None = None
+        self._update_job: str | None = None
+        #: The newer release, once the background check has found one.
+        self.newer_release: Release | None = None
         self._view: View | None = None
         self._view_factory: type[View] = HomeView
         self._view_options: dict[str, object] = {}
@@ -77,6 +85,7 @@ class MainWindow(ctk.CTk):
         else:
             self.show_home()
         self._poll_job = self.after(POLL_INTERVAL_MS, self._drain_events)
+        self._start_update_check()
 
     def _apply_icon(self) -> None:
         """Put the logo in the title bar and the taskbar.
@@ -98,6 +107,42 @@ class MainWindow(ctk.CTk):
         # Then the real thing: one image per size, which iconbitmap
         # does not do - see ui/winicon.py.
         winicon.apply_icon(self, icon)
+
+    # ------------------------------------------------------------------
+    #  Update notice
+    # ------------------------------------------------------------------
+    def _start_update_check(self) -> None:
+        """Ask GitHub about newer releases, unless told not to.
+
+        Off the main thread, because a network call on it would freeze
+        the window, and collected by polling because tk cannot be
+        touched from anywhere else.
+        """
+        if not self.settings.checks_for_updates:
+            return
+        found: list[Release] = []
+        threading.Thread(
+            target=lambda: self._look_for_update(found),
+            name="update-check",
+            daemon=True,
+        ).start()
+        self._update_job = self.after(UPDATE_POLL_MS, self._collect_update, found)
+
+    def _look_for_update(self, found: list[Release]) -> None:
+        release = newer_than(__version__)
+        if release is not None:
+            found.append(release)
+
+    def _collect_update(self, found: list[Release]) -> None:
+        if not found:
+            self._update_job = self.after(UPDATE_POLL_MS, self._collect_update, found)
+            return
+        self._update_job = None
+        self.newer_release = found[0]
+        # Only the start screen shows it, and only if that is where
+        # the user still is - redrawing under them would be rude.
+        if isinstance(self._view, HomeView):
+            self._rebuild()
 
     # ------------------------------------------------------------------
     #  Navigation
@@ -213,7 +258,8 @@ class MainWindow(ctk.CTk):
     def destroy(self) -> None:
         # A callback firing after the widgets are gone raises out of
         # tkinter's event loop, where nothing catches it.
-        if self._poll_job is not None:
-            self.after_cancel(self._poll_job)
-            self._poll_job = None
+        for job in (self._poll_job, self._update_job):
+            if job is not None:
+                self.after_cancel(job)
+        self._poll_job = self._update_job = None
         super().destroy()

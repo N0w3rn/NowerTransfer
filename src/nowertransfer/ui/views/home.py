@@ -9,7 +9,7 @@ import customtkinter as ctk
 
 from ... import __version__
 from ...config import RelayMode
-from ...paths import asset
+from ...paths import asset, open_link
 from ...session import load_send_session
 from ..theme import COLORS, GAP, GOLD_ACCENT, RADIUS, RADIUS_LARGE, display, font, mono
 from ..widgets import Card, StatusDot, badge, hint, link_button, primary_button
@@ -32,6 +32,7 @@ class HomeView(View):
         else:
             self._role_cards()
             self._resume_link()
+            self._update_notice()
 
         self._footer()
 
@@ -127,6 +128,30 @@ class HomeView(View):
         widget.configure(cursor="hand2")
         for child in widget.winfo_children():
             self._make_clickable(child, command)
+
+    def _update_notice(self) -> None:
+        """Say a newer release exists, once the check has found one.
+
+        This is not vanity: croc rejects peers across a major version,
+        so when the pinned croc moves, every copy in circulation has
+        to be replaced at the same time.
+        """
+        release = self.window.newer_release
+        if release is None:
+            return
+        strip = ctk.CTkFrame(self, fg_color=COLORS.panel, corner_radius=RADIUS)
+        strip.pack(fill="x", pady=(GAP, 0))
+        StatusDot(
+            strip,
+            self.t("update.available", version=release.version),
+            COLORS.gold,
+        ).pack(side="left", padx=(16, 0), pady=11)
+        link_button(
+            strip,
+            self.t("update.open"),
+            lambda: open_link(release.url),
+            width=110,
+        ).pack(side="right", padx=8)
 
     def _resume_link(self) -> None:
         session = load_send_session()

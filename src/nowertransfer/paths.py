@@ -117,6 +117,14 @@ def open_in_file_manager(path: Path) -> None:
             subprocess.run(["xdg-open", str(path)], check=False)
 
 
+def open_link(url: str) -> None:
+    """Open a web address in whatever browser the user has."""
+    import webbrowser
+
+    with suppress(OSError, webbrowser.Error):
+        webbrowser.open(url)
+
+
 def write_atomic(path: Path, text: str, *, private: bool = False) -> None:
     """Write ``text`` to ``path`` without leaving a half-written file behind.
 

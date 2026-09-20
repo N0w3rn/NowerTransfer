@@ -169,6 +169,29 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     "relay.unreachable": {"en": "Relay not reachable", "de": "Relay nicht erreichbar"},
     "relay.test": {"en": "Test connection", "de": "Verbindung testen"},
+    "update.available": {
+        "en": "Version {version} is out",
+        "de": "Version {version} ist da",
+    },
+    "update.open": {"en": "Release", "de": "Release"},
+    "settings.update_check": {
+        "en": "Check for new versions",
+        "de": "Nach neuen Versionen suchen",
+    },
+    "settings.update_check_hint": {
+        "en": (
+            "Asks GitHub once per start whether a newer release exists. "
+            "Worth leaving on: croc refuses peers running a different "
+            "major version, so an update can be the difference between "
+            "transferring and not."
+        ),
+        "de": (
+            "Fragt GitHub einmal pro Start, ob es eine neuere Version gibt. "
+            "Sollte an bleiben: croc verweigert Gegenstellen mit anderer "
+            "Hauptversion, ein Update entscheidet also unter Umständen "
+            "darüber, ob überhaupt übertragen wird."
+        ),
+    },
     "home.resume_short": {"en": "Resume", "de": "Fortsetzen"},
     "home.resume_open": {"en": "Open", "de": "Öffnen"},
     "send.step": {"en": "Step 1 of 2", "de": "Schritt 1 von 2"},

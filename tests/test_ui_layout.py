@@ -207,6 +207,53 @@ def test_a_selection_from_the_command_line_opens_the_send_screen(ui, tmp_path):
         window.destroy()
 
 
+def test_a_newer_release_is_announced_on_the_start_screen(ui):
+    from nowertransfer.updates import Release
+
+    ui.window.newer_release = Release("9.9.9", "https://example.com/r")
+    try:
+        view = ui.open("home")
+        shown = [
+            child for child in view.winfo_children() if "9.9.9" in _all_text(child)
+        ]
+        assert shown, "the notice is not on the screen"
+        assert not ui.collapsed(view)
+    finally:
+        ui.window.newer_release = None
+
+
+def test_nothing_is_announced_without_a_newer_release(ui):
+    ui.window.newer_release = None
+    view = ui.open("home")
+    assert "9.9.9" not in _all_text(view)
+
+
+def _all_text(widget) -> str:
+    import contextlib
+
+    texts = []
+    with contextlib.suppress(Exception):  # not every widget has text
+        texts.append(str(widget.cget("text")))
+    for child in widget.winfo_children():
+        texts.append(_all_text(child))
+    return " ".join(texts)
+
+
+def test_the_update_check_can_be_switched_off(ui, tmp_path, monkeypatch):
+    # It contacts GitHub, so it has to be refusable.
+    from nowertransfer import config
+
+    monkeypatch.setattr(config, "user_config_path", lambda: tmp_path / "config.toml")
+
+    view = ui.open("settings")
+    assert view._update_check.get(), "should start switched on"
+    view._update_check.deselect()
+    view._save()
+    settle(ui.window)
+
+    assert config.load_settings().checks_for_updates is False
+
+
 def test_the_role_cards_sit_under_the_header(ui):
     # They used to float in the middle of the window, because their
     # row took the spare height. The header, the cards and the resume

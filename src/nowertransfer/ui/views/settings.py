@@ -52,6 +52,7 @@ class SettingsView(View):
         self._mode_group()
         self._relay_fields()
         self._check_row()
+        self._update_row()
         self._sync_relay_fields()
 
     # ------------------------------------------------------------------
@@ -181,6 +182,37 @@ class SettingsView(View):
             anchor="w", fill="x", padx=14, pady=(0, 13)
         )
 
+    def _update_row(self) -> None:
+        card = ctk.CTkFrame(self, fg_color=COLORS.panel, corner_radius=RADIUS)
+        card.pack(fill="x", pady=(12, 0))
+
+        self._update_check = ctk.CTkCheckBox(
+            card,
+            text=self.t("settings.update_check"),
+            font=font(12),
+            text_color=COLORS.text,
+            checkbox_width=17,
+            checkbox_height=17,
+            corner_radius=4,
+            border_width=1,
+            border_color=COLORS.border,
+            fg_color=COLORS.gold,
+            hover_color=COLORS.gold_hover,
+            checkmark_color=COLORS.ink,
+        )
+        if self._draft_update_check():
+            self._update_check.select()
+        self._update_check.pack(anchor="w", padx=14, pady=(13, 0))
+        hint(card, self.t("settings.update_check_hint"), width=600).pack(
+            anchor="w", fill="x", padx=14, pady=(7, 13)
+        )
+
+    def _draft_update_check(self) -> bool:
+        draft = self.options.get("draft_update_check")
+        if isinstance(draft, bool):
+            return draft
+        return self.window.settings.checks_for_updates
+
     # ------------------------------------------------------------------
     def _run_check(self) -> None:
         """Ask the relay, in the background; tk stays on its own thread."""
@@ -231,6 +263,7 @@ class SettingsView(View):
             "draft_host": self._host_entry.get(),
             "draft_password": self._password_entry.get(),
             "draft_mode": self._selected_mode().value,
+            "draft_update_check": bool(self._update_check.get()),
         }
 
     def _draft(self, key: str, stored: str) -> str:
@@ -283,6 +316,9 @@ class SettingsView(View):
 
         updated = with_relay(self.window.settings, host, self._password_entry.get())
         updated.relay_mode = mode.value
+        # Only "off" is stored: leaving it on is the default, and an
+        # empty value keeps the file to what the user actually changed.
+        updated.update_check = "" if self._update_check.get() else "off"
         path = save_settings(updated)
 
         # Re-read so the screen shows the resolved values and sources.

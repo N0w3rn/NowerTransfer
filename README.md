@@ -90,6 +90,18 @@ the first real transfer, which does say so plainly.
 The last three layers live on the user's machine and never appear in
 this repository.
 
+### Update notice
+
+Once per start the app asks GitHub whether a newer release exists, and
+says so on the start screen if there is one. It is on by default and a
+checkbox in the settings turns it off; nothing is sent but the request
+itself, and a failure is silent.
+
+It is not there for polish. croc refuses peers running a different
+major version, so when the pinned croc moves across one, every copy
+handed out stops working at the same moment — and somebody who was
+given an `.exe` has no other way of hearing about it.
+
 ### Which relay
 
 `RELAY_MODE`, also changeable in the settings screen:

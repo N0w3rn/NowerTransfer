@@ -35,6 +35,9 @@ CROC_DEFAULT_RELAY_PASSWORD = "pass123"
 
 DEFAULT_RELAY_PORT = 9009
 
+#: Values of ``update_check`` that mean "do not contact GitHub".
+UPDATE_CHECK_OFF = frozenset({"off", "no", "false", "0"})
+
 BAKED_CONFIG_NAME = "relay.toml"
 PORTABLE_CONFIG_NAME = "nowertransfer.toml"
 USER_CONFIG_NAME = "config.toml"
@@ -60,6 +63,7 @@ _KEYS: dict[str, str | None] = {
     "relay_mode": ENV_RELAY_MODE,
     "language": ENV_LANGUAGE,
     "download_dir": None,
+    "update_check": None,
 }
 
 
@@ -122,6 +126,9 @@ class Settings:
     relay_mode: str = RelayMode.OWN.value
     language: str = ""
     download_dir: str = ""
+    #: "off" stops the app asking GitHub whether a newer release
+    #: exists. Anything else, including empty, leaves it on.
+    update_check: str = ""
     sources: dict[str, Source] = field(default_factory=dict)
 
     @property
@@ -147,6 +154,11 @@ class Settings:
     @property
     def allows_public_fallback(self) -> bool:
         return self.mode is RelayMode.FALLBACK and bool(self.relay_host)
+
+    @property
+    def checks_for_updates(self) -> bool:
+        """Whether the app may ask GitHub about newer releases."""
+        return self.update_check.strip().lower() not in UPDATE_CHECK_OFF
 
     def source_of(self, key: str) -> Source:
         return self.sources.get(key, Source.DEFAULT)
