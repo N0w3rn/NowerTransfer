@@ -12,7 +12,7 @@ import customtkinter as ctk
 
 from ...codes import code_entropy_bits, generate_code
 from ...paths import human_size, total_size
-from ...session import clear_session, save_send_session
+from ...session import forget, remember_send
 from ..dnd import accept_files
 from ..icons import Icon
 from ..theme import COLORS, GAP, PAD_CARD, RADIUS_LARGE, SEND_ACCENT, font, mono
@@ -229,9 +229,7 @@ class SendView(TransferScreen):
             return
         # Only once it is actually running: a session saved for a
         # transfer that never started offers a resume for nothing.
-        save_send_session(
-            self.window.send_code, [str(p) for p in self.window.send_paths]
-        )
+        remember_send(self.window.send_code, [str(p) for p in self.window.send_paths])
         self.enter_running()
         self.panel.set_phase(self.t("send.connecting"))
 
@@ -239,7 +237,9 @@ class SendView(TransferScreen):
         return self.t("done.sent")
 
     def on_finished(self) -> None:
-        clear_session()
+        # Before the phrase is replaced: it is what identifies the
+        # entry to drop, and any other unfinished transfer stays.
+        forget(self.window.send_code)
         # The phrase is the encryption key, so the next transfer gets a
         # new one rather than reusing one that has already been shared.
         self.window.send_code = generate_code()

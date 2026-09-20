@@ -88,10 +88,11 @@ class Harness:
         self.window = window
         self.tmp_path = tmp_path
 
-    def settings(self, language: str, configured: bool) -> Settings:
+    def settings(self, language: str, configured: bool, public: bool) -> Settings:
         return Settings(
             relay_host="relay.example.com:9009" if configured else "",
             relay_password="hunter2" if configured else "",
+            relay_mode=(RelayMode.PUBLIC if public else RelayMode.OWN).value,
             language=language,
             download_dir=str(self.tmp_path),
             sources={"relay_host": Source.BUILD, "relay_password": Source.BUILD},
@@ -103,10 +104,11 @@ class Harness:
         *,
         language: str = "de",
         configured: bool = True,
+        public: bool = False,
         size: str = SIZES[0],
     ):
         window = self.window
-        window.settings = self.settings(language, configured)
+        window.settings = self.settings(language, configured, public)
         window.t = Translator(language)
         window.geometry(size)
         getattr(window, f"show_{screen}")()
@@ -314,6 +316,45 @@ def test_the_relay_dot_says_what_the_relay_is_doing(ui, reachable, expect_gold):
         assert colour == COLORS.error
 
 
+def test_the_public_relay_says_it_is_unchecked_rather_than_looking_broken(ui):
+    # Public mode never runs the check - croc holds the address, so
+    # there is nothing of ours to reach - and the dot was left at the
+    # same faint grey that means "still checking". Next to a relay
+    # that answers fine when tested by hand, that reads as a fault.
+    from nowertransfer.ui.theme import COLORS
+
+    view = ui.open("home", language="en", public=True)
+    dot = view._relay_dot
+
+    assert "not tested" in dot._label.cget("text")
+    assert dot._dot.cget("fg_color") not in (COLORS.error, COLORS.gold, COLORS.faint)
+
+
+def test_the_public_relay_is_named_once_not_twice(ui):
+    # The footer used to print the mode beside the dot as if it were
+    # an address; with the dot naming it too that was the same words
+    # twice in one strip.
+    view = ui.open("home", language="en", public=True)
+    labels = [
+        child.cget("text")
+        for child in _descendants(view)
+        if isinstance(child, ctk.CTkLabel) and "public relay" in str(child.cget("text"))
+    ]
+
+    assert len(labels) == 1, labels
+
+
+def test_an_own_relay_still_shows_its_address(ui):
+    view = ui.open("home", language="en")
+    shown = [
+        child.cget("text")
+        for child in _descendants(view)
+        if isinstance(child, ctk.CTkLabel)
+    ]
+
+    assert any("relay.example.com" in str(text) for text in shown), shown
+
+
 def _descendants(widget):
     for child in widget.winfo_children():
         yield child
@@ -411,8 +452,7 @@ def test_a_resumable_receive_warns_that_the_file_is_not_finished(ui, tmp_path):
     target.mkdir()
     stored = session.ReceiveSession("falke-wolke-tiger-nebel-quarz-83", str(target))
     monkey = pytest.MonkeyPatch()
-    monkey.setattr(home_view, "load_send_session", lambda: None)
-    monkey.setattr(home_view, "load_receive_session", lambda: stored)
+    monkey.setattr(home_view, "unfinished", lambda: [stored])
     try:
         view = ui.open("home", language="en")
         shown = _all_text(view)
@@ -434,7 +474,7 @@ def test_a_resumable_send_says_nothing_about_an_unfinished_file(ui, tmp_path):
     payload.write_text("x", encoding="utf-8")
     stored = session.SendSession("falke-wolke-tiger-nebel-quarz-83", [str(payload)])
     monkey = pytest.MonkeyPatch()
-    monkey.setattr(home_view, "load_send_session", lambda: stored)
+    monkey.setattr(home_view, "unfinished", lambda: [stored])
     try:
         view = ui.open("home", language="en")
         shown = _all_text(view)
@@ -442,6 +482,82 @@ def test_a_resumable_send_says_nothing_about_an_unfinished_file(ui, tmp_path):
         assert "complete" not in shown, shown
     finally:
         monkey.undo()
+
+
+def _fake_transfers(count, tmp_path):
+    from nowertransfer.session import ReceiveSession, SendSession
+
+    made = []
+    for index in range(count):
+        payload = tmp_path / f"file{index}.bin"
+        payload.write_text("x", encoding="utf-8")
+        code = f"falke-wolke-tiger-nebel-quarz-{index:02d}"
+        made.append(
+            ReceiveSession(code, str(tmp_path))
+            if index % 2
+            else SendSession(code, [str(payload)])
+        )
+    return made
+
+
+@pytest.mark.parametrize("count", [1, 2, 3, 4, 9])
+def test_every_unfinished_transfer_is_offered(ui, tmp_path, monkeypatch, count):
+    # One transfer used to replace another: starting a second meant
+    # the first was forgotten, though croc can carry on with either.
+    from nowertransfer.ui.views import home as home_view
+
+    transfers = _fake_transfers(count, tmp_path)
+    monkeypatch.setattr(home_view, "unfinished", lambda: transfers)
+
+    view = ui.open("home")
+    shown = _all_text(view)
+
+    for transfer in transfers:
+        assert transfer.code in shown, f"{transfer.code} is missing"
+    assert not ui.collapsed(view)
+
+
+def test_a_long_list_scrolls_rather_than_growing(ui, tmp_path, monkeypatch):
+    # Without this the rows push the footer off the bottom of the
+    # window, which is the failure the layout tests exist to catch.
+    from nowertransfer.ui.views import home as home_view
+
+    monkeypatch.setattr(home_view, "unfinished", lambda: _fake_transfers(12, tmp_path))
+
+    view = ui.open("home", size=SIZES[1])
+
+    # Searched through the whole tree: CustomTkinter puts a
+    # CTkScrollableFrame inside a frame of its own, so it is never a
+    # direct child of what it was packed into.
+    boxes = [
+        widget
+        for widget in _descendants(view)
+        if isinstance(widget, ctk.CTkScrollableFrame)
+    ]
+    assert boxes, "twelve transfers should have gone into a scrolling box"
+
+    # The scrollable frame itself is the content and grows with it;
+    # what must stay capped is the box the screen actually holds, so
+    # walk up to the widget the view owns.
+    container = boxes[0]
+    while container.master is not view:
+        container = container.master
+    assert container.winfo_height() < 300, container.winfo_height()
+    assert not ui.collapsed(view)
+
+
+def test_a_short_list_does_not_scroll(ui, tmp_path, monkeypatch):
+    from nowertransfer.ui.views import home as home_view
+
+    monkeypatch.setattr(home_view, "unfinished", lambda: _fake_transfers(2, tmp_path))
+
+    view = ui.open("home")
+
+    assert not [
+        widget
+        for widget in _descendants(view)
+        if isinstance(widget, ctk.CTkScrollableFrame)
+    ]
 
 
 def test_the_role_cards_sit_under_the_header(ui):
@@ -511,7 +627,7 @@ def test_a_send_that_cannot_start_leaves_no_resume_behind(ui, tmp_path):
     view.start_transfer()
     settle(ui.window)
 
-    assert session.load_send_session() is None
+    assert session.unfinished() == []
 
 
 def test_the_code_on_screen_is_the_one_that_will_be_sent(ui):

@@ -198,7 +198,10 @@ CATALOG: dict[str, dict[str, str]] = {
             "darüber, ob überhaupt übertragen wird."
         ),
     },
-    "home.resume_short": {"en": "Resume", "de": "Fortsetzen"},
+    #: Several transfers can be waiting at once, so each row says
+    #: which way it was going rather than only "resume".
+    "home.resume_sending": {"en": "Sending", "de": "Senden"},
+    "home.resume_receiving": {"en": "Receiving", "de": "Empfangen"},
     #: croc writes the destination at its full size from the start, so
     #: an unfinished file is the same number of bytes as a finished
     #: one. Nothing on disk shows that; only this line does.
@@ -404,7 +407,13 @@ CATALOG: dict[str, dict[str, str]] = {
             "wie viel an wen überträgt, ist dort sichtbar."
         ),
     },
-    "relay.public": {"en": "croc public relay", "de": "öffentliches croc-Relay"},
+    #: The footer line in public mode. There is no address of ours to
+    #: reach, so saying "not reachable" or leaving a grey dot that
+    #: reads as a fault would both be wrong: croc brings its own.
+    "relay.public_unchecked": {
+        "en": "croc public relay · not tested from here",
+        "de": "öffentliches croc-Relay · von hier nicht geprüft",
+    },
     "settings.save": {"en": "Save", "de": "Speichern"},
     "settings.saved": {"en": "Saved to {path}", "de": "Gespeichert unter {path}"},
     "settings.invalid_host": {

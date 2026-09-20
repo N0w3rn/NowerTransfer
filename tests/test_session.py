@@ -1,3 +1,6 @@
+"""Remembering interrupted transfers, in both directions and several
+at once."""
+
 import json
 
 import pytest
@@ -5,6 +8,12 @@ import pytest
 from nowertransfer import paths, secretstore, session
 
 CODE = "falke-wolke-tiger-nebel-83"
+OTHER = "rabe-quarz-tanne-segel-17"
+
+encrypted_only = pytest.mark.skipif(
+    not secretstore.is_encrypting(),
+    reason="no OS keystore on this platform; values are stored in the clear",
+)
 
 
 @pytest.fixture(autouse=True)
@@ -13,164 +22,229 @@ def isolated_session(tmp_path, monkeypatch):
     monkeypatch.setattr(session, "user_config_dir", lambda: tmp_path)
 
 
-def test_round_trip(tmp_path):
+@pytest.fixture
+def a_file(tmp_path):
     payload = tmp_path / "payload.txt"
     payload.write_text("hi", encoding="utf-8")
+    return payload
 
-    session.save_send_session(CODE, [str(payload)])
-    restored = session.load_send_session()
 
-    assert restored is not None
+@pytest.fixture
+def a_folder(tmp_path):
+    folder = tmp_path / "downloads"
+    folder.mkdir()
+    return folder
+
+
+# ----------------------------------------------------------------------
+#  One transfer, either direction
+# ----------------------------------------------------------------------
+def test_a_send_round_trips(a_file):
+    session.remember_send(CODE, [str(a_file)])
+    (restored,) = session.unfinished()
+
+    assert isinstance(restored, session.SendSession)
     assert restored.code == CODE
-    assert restored.paths == [str(payload)]
+    assert restored.paths == [str(a_file)]
 
 
-@pytest.mark.skipif(
-    not secretstore.is_encrypting(),
-    reason="no OS keystore on this platform; values are stored in the clear",
-)
-def test_the_code_phrase_is_not_stored_in_the_clear(tmp_path):
-    # The code phrase is croc's end-to-end encryption secret, so the
-    # resume file must not hand it to anyone who opens it.
-    payload = tmp_path / "payload.txt"
-    payload.write_text("hi", encoding="utf-8")
-    session.save_send_session(CODE, [str(payload)])
+def test_a_receive_round_trips(a_folder):
+    session.remember_receive(CODE, a_folder)
+    (restored,) = session.unfinished()
 
-    assert CODE not in session.session_path().read_text(encoding="utf-8")
+    assert isinstance(restored, session.ReceiveSession)
+    assert restored.code == CODE
+    assert restored.target == str(a_folder)
 
 
-@pytest.mark.skipif(
-    not secretstore.is_encrypting(),
-    reason="no OS keystore on this platform; values are stored in the clear",
-)
-def test_the_paths_are_not_stored_in_the_clear(tmp_path):
-    # A folder name says what was being sent. It is worth as little to
-    # a reader of this file as the code phrase is.
+def test_nothing_stored_yields_nothing():
+    assert session.unfinished() == []
+
+
+@encrypted_only
+def test_neither_the_phrase_nor_the_paths_are_stored_in_the_clear(tmp_path):
     payload = tmp_path / "quarterly numbers.txt"
     payload.write_text("hi", encoding="utf-8")
-    session.save_send_session(CODE, [str(payload)])
+    session.remember_send(CODE, [str(payload)])
 
     stored = session.session_path().read_text(encoding="utf-8")
+    assert CODE not in stored
     assert "quarterly numbers" not in stored
-    assert str(tmp_path) not in stored
 
 
-def test_a_session_written_before_the_paths_were_encrypted_still_resumes(tmp_path):
-    # Upgrading must not silently drop somebody's resume point.
-    payload = tmp_path / "payload.txt"
-    payload.write_text("hi", encoding="utf-8")
-    session.session_path().write_text(
-        json.dumps(
-            {
-                "mode": "send",
-                "code": secretstore.protect(CODE),
-                "paths": [payload.as_posix()],  # as an older version wrote it
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    restored = session.load_send_session()
-
-    assert restored is not None
-    assert restored.code == CODE
-    assert restored.paths == [payload.as_posix()]
-
-
-def test_a_session_from_another_machine_is_not_offered(tmp_path):
-    payload = tmp_path / "payload.txt"
-    payload.write_text("hi", encoding="utf-8")
-    session.session_path().write_text(
-        '{"mode": "send", "code": "dpapi:AQAAANCMnd8BFdERjHoAwE/Cl+s=",'
-        f' "paths": ["{payload.as_posix()}"]}}',
-        encoding="utf-8",
-    )
-    assert session.load_send_session() is None
-
-
-def test_nothing_stored_yields_none():
-    assert session.load_send_session() is None
-
-
-def test_files_that_disappeared_are_dropped(tmp_path):
-    kept = tmp_path / "kept.txt"
-    kept.write_text("x", encoding="utf-8")
-    session.save_send_session("code-word-here", [str(kept), str(tmp_path / "gone.txt")])
-    restored = session.load_send_session()
-    assert restored is not None
-    assert restored.paths == [str(kept)]
-
-
-def test_a_session_whose_files_all_vanished_is_not_offered(tmp_path):
-    session.save_send_session("code-word-here", [str(tmp_path / "gone.txt")])
-    assert session.load_send_session() is None
-
-
-def test_corrupt_session_file_is_ignored():
-    session.session_path().write_text("{not json", encoding="utf-8")
-    assert session.load_send_session() is None
-
-
-def test_clearing_is_idempotent():
-    session.clear_session()
-    session.clear_session()
-    assert session.load_send_session() is None
-
-
-# ----------------------------------------------------------------------
-#  Receives are remembered too
-# ----------------------------------------------------------------------
-def test_a_receive_round_trips(tmp_path):
-    target = tmp_path / "downloads"
-    target.mkdir()
-
-    session.save_receive_session(CODE, target)
-    restored = session.load_receive_session()
-
-    assert restored is not None
-    assert restored.code == CODE
-    assert restored.target == str(target)
-
-
-@pytest.mark.skipif(
-    not secretstore.is_encrypting(),
-    reason="no OS keystore on this platform; values are stored in the clear",
-)
-def test_a_receive_is_not_stored_in_the_clear(tmp_path):
-    target = tmp_path / "tax returns"
-    target.mkdir()
-    session.save_receive_session(CODE, target)
+@encrypted_only
+def test_a_receive_target_is_not_stored_in_the_clear(tmp_path):
+    folder = tmp_path / "tax returns"
+    folder.mkdir()
+    session.remember_receive(CODE, folder)
 
     stored = session.session_path().read_text(encoding="utf-8")
     assert CODE not in stored
     assert "tax returns" not in stored
 
 
-def test_a_receive_whose_folder_is_gone_is_not_offered(tmp_path):
-    target = tmp_path / "downloads"
-    target.mkdir()
-    session.save_receive_session(CODE, target)
-    target.rmdir()
+# ----------------------------------------------------------------------
+#  Several at once
+# ----------------------------------------------------------------------
+def test_several_transfers_are_all_kept(tmp_path, a_file, a_folder):
+    second = tmp_path / "second.txt"
+    second.write_text("x", encoding="utf-8")
 
-    assert session.load_receive_session() is None
+    session.remember_send(CODE, [str(a_file)])
+    session.remember_receive(OTHER, a_folder)
+    session.remember_send("segel-rose-ufer-pilz-42", [str(second)])
 
-
-def test_the_two_directions_do_not_answer_for_each_other(tmp_path):
-    # One transfer runs at a time and one file holds it, so a stored
-    # send must not surface as a receive or the other way round.
-    payload = tmp_path / "payload.txt"
-    payload.write_text("hi", encoding="utf-8")
-
-    session.save_send_session(CODE, [str(payload)])
-    assert session.load_send_session() is not None
-    assert session.load_receive_session() is None
-
-    session.save_receive_session(CODE, tmp_path)
-    assert session.load_receive_session() is not None
-    assert session.load_send_session() is None
+    assert len(session.unfinished()) == 3
 
 
-def test_clearing_forgets_a_receive_too(tmp_path):
-    session.save_receive_session(CODE, tmp_path)
-    session.clear_session()
-    assert session.load_receive_session() is None
+def test_the_newest_is_offered_first(a_file, a_folder):
+    session.remember_send(CODE, [str(a_file)])
+    session.remember_receive(OTHER, a_folder)
+
+    first, second = session.unfinished()
+    assert first.code == OTHER
+    assert second.code == CODE
+
+
+def test_starting_the_same_phrase_again_does_not_duplicate_it(a_file):
+    session.remember_send(CODE, [str(a_file)])
+    session.remember_send(CODE, [str(a_file)])
+
+    assert len(session.unfinished()) == 1
+
+
+def test_finishing_one_leaves_the_others(a_file, a_folder):
+    session.remember_send(CODE, [str(a_file)])
+    session.remember_receive(OTHER, a_folder)
+
+    session.forget(CODE)
+
+    remaining = session.unfinished()
+    assert [entry.code for entry in remaining] == [OTHER]
+
+
+def test_forgetting_the_last_one_removes_the_file(a_file):
+    session.remember_send(CODE, [str(a_file)])
+    session.forget(CODE)
+
+    assert not session.session_path().exists()
+    assert session.unfinished() == []
+
+
+def test_forgetting_a_phrase_nobody_stored_changes_nothing(a_file):
+    session.remember_send(CODE, [str(a_file)])
+    session.forget("never-stored-this-one-99")
+
+    assert len(session.unfinished()) == 1
+
+
+def test_forget_all_empties_the_list(a_file, a_folder):
+    session.remember_send(CODE, [str(a_file)])
+    session.remember_receive(OTHER, a_folder)
+
+    session.forget_all()
+
+    assert session.unfinished() == []
+
+
+# ----------------------------------------------------------------------
+#  Entries that can no longer be resumed
+# ----------------------------------------------------------------------
+def test_files_that_disappeared_are_dropped(tmp_path, a_file):
+    session.remember_send(CODE, [str(a_file), str(tmp_path / "gone.txt")])
+    (restored,) = session.unfinished()
+    assert restored.paths == [str(a_file)]
+
+
+def test_a_send_whose_files_all_vanished_is_not_offered(tmp_path):
+    session.remember_send(CODE, [str(tmp_path / "gone.txt")])
+    assert session.unfinished() == []
+
+
+def test_a_receive_whose_folder_is_gone_is_not_offered(a_folder):
+    session.remember_receive(CODE, a_folder)
+    a_folder.rmdir()
+    assert session.unfinished() == []
+
+
+def test_a_transfer_from_another_machine_is_not_offered(a_file):
+    session.session_path().write_text(
+        json.dumps(
+            {
+                "version": 2,
+                "transfers": [
+                    {
+                        "mode": "send",
+                        "code": "dpapi:AQAAANCMnd8BFdERjHoAwE/Cl+s=",
+                        "paths": [str(a_file)],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert session.unfinished() == []
+
+
+def test_a_corrupt_file_is_ignored():
+    session.session_path().write_text("{not json", encoding="utf-8")
+    assert session.unfinished() == []
+
+
+def test_an_entry_of_an_unknown_kind_is_ignored(a_file):
+    session.session_path().write_text(
+        json.dumps(
+            {
+                "version": 2,
+                "transfers": [
+                    {"mode": "sideways", "code": secretstore.protect(CODE)},
+                    {
+                        "mode": "send",
+                        "code": secretstore.protect(OTHER),
+                        "paths": [secretstore.protect(str(a_file))],
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert [entry.code for entry in session.unfinished()] == [OTHER]
+
+
+# ----------------------------------------------------------------------
+#  The file an older version wrote
+# ----------------------------------------------------------------------
+def test_a_file_from_the_single_transfer_version_still_resumes(a_file):
+    # Version 1 wrote the one transfer as the whole file. Upgrading
+    # must not silently throw somebody's resume point away.
+    session.session_path().write_text(
+        json.dumps(
+            {
+                "mode": "send",
+                "code": secretstore.protect(CODE),
+                "paths": [secretstore.protect(str(a_file))],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    (restored,) = session.unfinished()
+    assert restored.code == CODE
+    assert restored.paths == [str(a_file)]
+
+
+def test_an_older_file_with_plain_paths_still_resumes(a_file):
+    # Older still: the paths were not encrypted at all.
+    session.session_path().write_text(
+        json.dumps(
+            {
+                "mode": "send",
+                "code": secretstore.protect(CODE),
+                "paths": [a_file.as_posix()],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    (restored,) = session.unfinished()
+    assert restored.paths == [a_file.as_posix()]

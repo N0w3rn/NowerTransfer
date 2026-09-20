@@ -10,7 +10,7 @@ import customtkinter as ctk
 
 from ...codes import is_our_code, is_plausible_code
 from ...paths import open_in_file_manager
-from ...session import clear_session, save_receive_session
+from ...session import forget, remember_receive
 from ..theme import COLORS, GAP, PAD_CARD, RADIUS, RECEIVE_ACCENT, font, mono
 from ..widgets import caption, entry, hint, quiet_button
 from .base import TransferScreen
@@ -125,12 +125,15 @@ class ReceiveView(TransferScreen):
             return
         # Only once it is running: a resume point for a transfer that
         # never started offers something that does not exist.
-        save_receive_session(code, self.window.receive_dir)
+        remember_receive(code, self.window.receive_dir)
+        self._running_code = code
         self.enter_running()
         self.panel.set_phase(self.t("receive.connecting"))
 
     def on_finished(self) -> None:
-        clear_session()
+        # Only this one: another interrupted transfer is still worth
+        # offering.
+        forget(getattr(self, "_running_code", ""))
 
     def _show_finished(self) -> None:
         """Two ways on: straight to the files, or back to the start."""
