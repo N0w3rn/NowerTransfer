@@ -578,6 +578,42 @@ def test_a_long_list_scrolls_rather_than_growing(ui, tmp_path, monkeypatch):
     assert not ui.collapsed(view)
 
 
+@pytest.mark.parametrize("index", [0, 1, 2])
+def test_opening_a_row_resumes_that_transfer_and_no_other(
+    ui, tmp_path, monkeypatch, index
+):
+    # The point of the list is picking one out of several, so the row
+    # has to carry its own transfer rather than the newest or the last
+    # one built - the mistake a loop over widgets invites.
+    from nowertransfer.ui.views import home as home_view
+
+    transfers = _fake_transfers(3, tmp_path)
+    monkeypatch.setattr(home_view, "unfinished", lambda: transfers)
+
+    view = ui.open("home")
+    label = ui.window.t("home.resume_open")
+    buttons = [
+        widget
+        for widget in _descendants(view)
+        if isinstance(widget, ctk.CTkButton) and widget.cget("text") == label
+    ]
+    assert len(buttons) == 3, f"{len(buttons)} open buttons for 3 transfers"
+
+    buttons[index].invoke()
+    settle(ui.window)
+
+    wanted = transfers[index]
+    opened = ui.window._view
+    if isinstance(wanted, home_view.ReceiveSession):
+        assert type(opened).__name__ == "ReceiveView"
+        assert opened._code_entry.get() == wanted.code
+        assert str(ui.window.receive_dir) == wanted.target
+    else:
+        assert type(opened).__name__ == "SendView"
+        assert ui.window.send_code == wanted.code
+        assert [str(p) for p in ui.window.send_paths] == wanted.paths
+
+
 def test_a_short_list_does_not_scroll(ui, tmp_path, monkeypatch):
     from nowertransfer.ui.views import home as home_view
 
