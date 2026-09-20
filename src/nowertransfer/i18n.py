@@ -23,10 +23,6 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "Direct file transfer over your own relay",
         "de": "Direkte Dateiübertragung über dein eigenes Relay",
     },
-    "app.footer": {
-        "en": "v{version} · Relay: {relay}",
-        "de": "v{version} · Relay: {relay}",
-    },
     "nav.back": {"en": "←  Back", "de": "←  Zurück"},
     "nav.settings": {"en": "Settings", "de": "Einstellungen"},
     # -- home ---------------------------------------------------------
@@ -74,10 +70,6 @@ CATALOG: dict[str, dict[str, str]] = {
         ),
     },
     # -- send ---------------------------------------------------------
-    "send.subtitle": {
-        "en": "Send — pick your files, pass on the code",
-        "de": "Senden — Dateien auswählen, Code weitergeben",
-    },
     "send.choose_folder": {"en": "Choose folder", "de": "Ordner wählen"},
     "send.choose_files": {"en": "Choose files", "de": "Dateien wählen"},
     "send.folder_dialog": {"en": "Which folder?", "de": "Welchen Ordner senden?"},
@@ -110,10 +102,6 @@ CATALOG: dict[str, dict[str, str]] = {
         "de": "Mit dem Relay verbunden, warte auf den Empfänger …",
     },
     # -- receive ------------------------------------------------------
-    "receive.subtitle": {
-        "en": "Receive — enter the code and collect",
-        "de": "Empfangen — Code eingeben und abholen",
-    },
     "receive.code_label": {
         "en": "CODE PHRASE — from the sender",
         "de": "CODE-PHRASE — vom Absender",
@@ -122,7 +110,6 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "e.g. falke-wolke-tiger-nebel-quarz-83",
         "de": "z. B. falke-wolke-tiger-nebel-quarz-83",
     },
-    "receive.choose_target": {"en": "Choose folder", "de": "Zielordner wählen"},
     "receive.target_dialog": {
         "en": "Where should the files go?",
         "de": "Wohin sollen die Dateien?",
@@ -143,7 +130,6 @@ CATALOG: dict[str, dict[str, str]] = {
     "stat.items": {"en": "Items", "de": "Einträge"},
     "stat.elapsed": {"en": "Elapsed", "de": "Verstrichen"},
     "stat.details": {"en": "Show details", "de": "Details anzeigen"},
-    "stat.unknown": {"en": "—", "de": "—"},
     "relay.label": {"en": "Relay", "de": "Relay"},
     "relay.checking": {"en": "Checking …", "de": "Wird geprüft …"},
     #: Deliberately not "relay ok": the test proves the address, never
@@ -241,7 +227,6 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "The sender has to have started the transfer.",
         "de": "Der Absender muss die Übertragung gestartet haben.",
     },
-    "status.running": {"en": "Running", "de": "Läuft"},
     "status.cancel_safe": {
         "en": "Cancelling is safe — the same code phrase resumes it.",
         "de": "Abbrechen ist gefahrlos — mit derselben Code-Phrase geht es weiter.",
@@ -249,25 +234,6 @@ CATALOG: dict[str, dict[str, str]] = {
     "done.title": {"en": "Everything arrived", "de": "Alles angekommen"},
     "done.sent": {"en": "Everything sent", "de": "Alles verschickt"},
     "done.close": {"en": "Done", "de": "Fertig"},
-    "setup.welcome": {
-        "en": (
-            "Enter your relay once and everything goes through it. You will "
-            "not have to think about it again."
-        ),
-        "de": (
-            "Trag einmal dein Relay ein, dann läuft alles darüber. Danach "
-            "musst du dich damit nie wieder befassen."
-        ),
-    },
-    "setup.start": {"en": "Let's go", "de": "Los geht's"},
-    "setup.use_public": {
-        "en": "No relay of your own? Use croc's public relay",
-        "de": "Kein eigenes Relay? Öffentliches croc-Relay nutzen",
-    },
-    "settings.port_added": {
-        "en": "Port 9009 is added when you leave it out.",
-        "de": "Port 9009 wird ergänzt, wenn du keinen angibst.",
-    },
     "settings.password_note": {
         "en": "optional · protects the relay, not the files",
         "de": "optional · schützt das Relay, nicht die Dateien",
@@ -278,10 +244,6 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     "status.cancel": {"en": "Cancel", "de": "Abbrechen"},
     "status.cancelling": {"en": "Cancelling …", "de": "Wird abgebrochen …"},
-    "status.cancelled": {
-        "en": "Cancelled. Start again with the same code phrase whenever you like.",
-        "de": "Abgebrochen. Mit derselben Code-Phrase jederzeit neu starten.",
-    },
     "status.retry": {
         "en": "Connection lost — trying again in {seconds} s.",
         "de": "Verbindung unterbrochen — neuer Versuch in {seconds} s.",
@@ -290,7 +252,6 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "Done. Everything arrived.",
         "de": "Fertig. Alles ist angekommen.",
     },
-    "status.finished_button": {"en": "Done!", "de": "Fertig!"},
     "status.fell_back": {
         "en": (
             "Your relay is not answering — continuing over croc's public "
@@ -364,25 +325,11 @@ CATALOG: dict[str, dict[str, str]] = {
     # -- settings -----------------------------------------------------
     "settings.title": {"en": "Settings", "de": "Einstellungen"},
     "settings.relay_host": {"en": "Relay address", "de": "Relay-Adresse"},
-    "settings.relay_host_hint": {
-        "en": "Host name or IP of your croc relay. Port 9009 is assumed.",
-        "de": "Hostname oder IP deines croc-Relays. Port 9009 wird ergänzt.",
-    },
     "settings.relay_host_placeholder": {
         "en": "relay.example.com",
         "de": "relay.example.com",
     },
     "settings.relay_password": {"en": "Relay password", "de": "Relay-Passwort"},
-    "settings.relay_password_hint": {
-        "en": (
-            "Optional. Keeps strangers off your relay; it does not protect "
-            "the files, which croc encrypts end to end either way."
-        ),
-        "de": (
-            "Optional. Hält Fremde vom Relay fern; die Dateien schützt es "
-            "nicht – die verschlüsselt croc ohnehin Ende-zu-Ende."
-        ),
-    },
     "settings.relay_password_placeholder": {
         "en": "leave empty for croc's default",
         "de": "leer lassen für croc-Standard",

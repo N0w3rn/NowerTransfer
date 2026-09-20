@@ -14,6 +14,7 @@ cannot skip everything and report success.
 from __future__ import annotations
 
 import os
+import re
 import sys
 
 import pytest
@@ -182,6 +183,29 @@ def ui(tmp_path_factory):
 def test_no_widget_is_squeezed_out_of_the_layout(ui, screen, language, size):
     view = ui.open(screen, language=language, size=size)
     assert not ui.collapsed(view), f"{screen} [{language}] @ {size}"
+
+
+@pytest.mark.parametrize("screen", SCREENS)
+@pytest.mark.parametrize("language", LANGUAGES)
+@pytest.mark.parametrize("public", [False, True])
+def test_no_screen_shows_a_raw_translation_key(ui, screen, language, public):
+    # An unknown key returns itself rather than raising, which is the
+    # right call at runtime and a trap in a checkout: deleting a key
+    # that is still used goes unnoticed, and the screen simply says
+    # "settings.relay_host_hint" at the user. Nothing else looks for
+    # that, so a tidy-up of the catalogue has to be checked here.
+    #
+    # By shape, not by asking the catalogue: a key that was deleted is
+    # no longer in it, which is exactly the case this has to catch.
+    # Measured, no real caption on any screen has this shape.
+    view = ui.open(screen, language=language, public=public)
+    leaked = [
+        word
+        for word in _all_text(view).split()
+        if re.fullmatch(r"[a-z][a-z0-9_]*(\.[a-z0-9_]+)+", word)
+    ]
+
+    assert not leaked, f"{screen} [{language}] shows a key rather than text: {leaked}"
 
 
 @pytest.mark.parametrize("screen", ["send", "receive", "settings"])
