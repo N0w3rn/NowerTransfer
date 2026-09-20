@@ -12,7 +12,13 @@ from typing import TYPE_CHECKING
 
 import customtkinter as ctk
 
-from ...transfer import EventType, TransferEvent, parse_incoming, parse_progress
+from ...transfer import (
+    EventType,
+    TransferEvent,
+    parse_incoming,
+    parse_progress,
+    parse_rate_and_remaining,
+)
 from .. import winicon
 from ..icons import Icon
 from ..theme import COLORS, GAP, NEUTRAL_ACCENT, Accent, display, font
@@ -286,6 +292,9 @@ class TransferScreen(View):
         progress = parse_progress(line)
         if progress is not None:
             self.panel.set_progress(progress)
+            moving = parse_rate_and_remaining(line)
+            if moving is not None:
+                self.panel.set_rate(*moving)
             return
         incoming = parse_incoming(line)
         if incoming is not None:

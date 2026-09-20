@@ -367,8 +367,8 @@ class TransferPanel(ctk.CTkFrame):
     Only what is actually known is shown. The bar sweeps until croc
     reports a percentage and follows it from then on - a transfer that
     finishes inside one of croc's redraws never reports one, which is
-    why the sweep has to exist. Nothing is invented: no speed, no
-    estimated time.
+    why the sweep has to exist. Speed and time left come from the same
+    line, in croc's own wording; nothing here is computed by guesswork.
     """
 
     def __init__(
@@ -402,6 +402,14 @@ class TransferPanel(ctk.CTkFrame):
         )
         self._bar.set(0)
         self._bar.pack(fill="x", padx=22, pady=(14, 0))
+
+        # croc's own speed and time-left, when it reports them. Under
+        # the bar rather than among the figures below: they change
+        # every second, and the figures do not.
+        self._rate = ctk.CTkLabel(
+            self, text="", font=mono(11), text_color=COLORS.faint, anchor="e"
+        )
+        self._rate.pack(fill="x", padx=22, pady=(6, 0))
 
         figures = ctk.CTkFrame(self, fg_color="transparent")
         figures.pack(fill="x", padx=22, pady=(18, 0))
@@ -447,8 +455,13 @@ class TransferPanel(ctk.CTkFrame):
         self._bar.set(fraction)
         self._percent.configure(text=f"{round(fraction * 100)}%")
 
+    def set_rate(self, rate: str, remaining: str) -> None:
+        """croc's speed and time-left, in croc's own words."""
+        self._rate.configure(text=f"{rate}   ·   {remaining}")
+
     def start_waiting(self) -> None:
         self._percent.configure(text="")
+        self._rate.configure(text="")
         self._bar.configure(mode="indeterminate")
         self._bar.start()
 
@@ -457,6 +470,8 @@ class TransferPanel(ctk.CTkFrame):
         self._bar.configure(mode="determinate")
         self._bar.set(1.0 if completed else 0.0)
         self._percent.configure(text="100%" if completed else "")
+        # Nothing is moving any more, so neither figure means anything.
+        self._rate.configure(text="")
 
     # -- figures and log -----------------------------------------------
     def set_stat(self, key: str, value: str) -> None:

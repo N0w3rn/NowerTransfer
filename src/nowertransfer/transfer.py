@@ -40,6 +40,16 @@ _CONFIG_ERROR_MARKERS = ("could not connect", *_RELAY_PASSWORD_MARKERS)
 
 _PROGRESS_PATTERN = re.compile(r"(\d{1,3})%")
 
+#: croc's progress line carries more than the percentage. Measured on a
+#: throttled transfer:
+#:   sample.bin  28% |#####   | (26/90 MB, 717 kB/s) [34s:1m29s]
+#: the rate sits after the comma and the brackets hold elapsed and
+#: remaining. Both are taken as croc formats them rather than
+#: recomputed - croc knows the numbers, and reformatting them is a
+#: chance to get units wrong for nothing.
+_RATE_PATTERN = re.compile(r",\s*([\d.]+\s*[kMGT]?B/s)\)")
+_REMAINING_PATTERN = re.compile(r"\[[^\]:]+:([^\]]+)\]")
+
 #: croc announces the incoming payload as: Receiving 'name' (6.0 MB),
 #: which is how the receiving side learns the size before any byte of
 #: it has arrived.
@@ -107,6 +117,20 @@ def parse_progress(line: str) -> float | None:
     if match is None:
         return None
     return min(100, int(match.group(1))) / 100
+
+
+def parse_rate_and_remaining(line: str) -> tuple[str, str] | None:
+    """``(speed, time left)`` from a progress line, as croc wrote them.
+
+    Both or neither: the first line of a transfer reads ``[0s:0s]``
+    with no rate yet, and "0s left" before anything has moved would be
+    a promise the app cannot keep.
+    """
+    rate = _RATE_PATTERN.search(line)
+    remaining = _REMAINING_PATTERN.search(line)
+    if rate is None or remaining is None:
+        return None
+    return rate.group(1).strip(), remaining.group(1).strip()
 
 
 def parse_incoming(line: str) -> tuple[str, str] | None:

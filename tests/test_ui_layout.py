@@ -451,6 +451,54 @@ def test_the_bundled_faces_are_the_ones_actually_drawn(ui, spec):
     )
 
 
+def test_the_panel_shows_crocs_speed_and_time_left(ui):
+    from nowertransfer.transfer import EventType, TransferEvent
+
+    view = ui.open("send")
+    view.enter_running()
+    view.on_transfer_event(
+        TransferEvent(
+            EventType.OUTPUT,
+            "sample.bin  28% |#####  | (26/90 MB, 717 kB/s) [34s:1m29s]",
+        )
+    )
+    settle(ui.window)
+
+    shown = view.panel._rate.cget("text")
+    assert "717 kB/s" in shown and "1m29s" in shown
+    assert view.panel._percent.cget("text") == "28%"
+
+
+def test_nothing_is_claimed_before_anything_has_moved(ui):
+    # croc's first progress line has no rate and reads [0s:0s].
+    from nowertransfer.transfer import EventType, TransferEvent
+
+    view = ui.open("receive")
+    view.enter_running()
+    view.on_transfer_event(
+        TransferEvent(EventType.OUTPUT, "probe.bin   0% |  | ( 0 B/400 kB) [0s:0s]")
+    )
+    settle(ui.window)
+
+    assert view.panel._rate.cget("text") == ""
+
+
+def test_the_figures_are_cleared_when_the_transfer_stops(ui):
+    from nowertransfer.transfer import EventType, TransferEvent
+
+    view = ui.open("send")
+    view.enter_running()
+    view.on_transfer_event(
+        TransferEvent(EventType.OUTPUT, "a.bin  9% |#| (8/90 MB, 717 kB/s) [10s:1m53s]")
+    )
+    settle(ui.window)
+    assert view.panel._rate.cget("text")
+
+    view.on_transfer_event(TransferEvent(EventType.FINISHED))
+    settle(ui.window)
+    assert view.panel._rate.cget("text") == "", "stale speed left on screen"
+
+
 # ----------------------------------------------------------------------
 #  Saying a transfer is over
 # ----------------------------------------------------------------------

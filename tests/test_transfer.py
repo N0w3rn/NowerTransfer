@@ -20,6 +20,7 @@ from nowertransfer.transfer import (
     looks_like_wrong_relay_password,
     parse_incoming,
     parse_progress,
+    parse_rate_and_remaining,
     redact,
 )
 
@@ -118,6 +119,35 @@ def test_version_mismatch_detection(line, expected):
 )
 def test_parse_incoming(line, expected):
     assert parse_incoming(line) == expected
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        # Measured on a throttled transfer against a real relay.
+        (
+            "sample.bin  28% |#####    | (26/90 MB, 717 kB/s) [34s:1m29s]",
+            ("717 kB/s", "1m29s"),
+        ),
+        (
+            "sample.bin   2% |         | (1.9/90 MB, 1.2 MB/s) [1s:1m14s]",
+            ("1.2 MB/s", "1m14s"),
+        ),
+        (
+            "big.bin 100% |#########| (400/400 kB, 350 MB/s) [12s:0s]",
+            ("350 MB/s", "0s"),
+        ),
+        # The first line of a transfer: no rate yet, and the brackets
+        # read [0s:0s]. "0s left" before anything has moved would be a
+        # promise the app cannot keep, so both or neither.
+        ("probe.bin   0% |         | ( 0 B/400 kB) [0s:0s]", None),
+        ("Receiving 'photo.jpg' (2.1 MB)", None),
+        ("46%", None),
+        ("", None),
+    ],
+)
+def test_parse_rate_and_remaining(line, expected):
+    assert parse_rate_and_remaining(line) == expected
 
 
 def test_the_public_web_receive_url_is_kept_out_of_the_ui():
