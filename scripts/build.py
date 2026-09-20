@@ -156,6 +156,10 @@ def pyinstaller_command(
         str(SRC_DIR),
         "--collect-all",
         "customtkinter",
+        # tkdnd is a Tcl extension living beside the Python package;
+        # without collecting the data files it is simply not there.
+        "--collect-all",
+        "tkinterdnd2",
         "--add-binary",
         f"{croc}{separator}.",
     ]

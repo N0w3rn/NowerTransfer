@@ -13,6 +13,7 @@ import customtkinter as ctk
 from ...codes import code_entropy_bits, generate_code
 from ...paths import human_size, total_size
 from ...session import clear_send_session, save_send_session
+from ..dnd import accept_files
 from ..theme import COLORS, GAP, PAD_CARD, RADIUS_LARGE, SEND_ACCENT, font, mono
 from ..widgets import Card, caption, link_button, quiet_button
 from .base import TransferScreen
@@ -48,16 +49,18 @@ class SendView(TransferScreen):
             border_color=COLORS.border,
         )
         zone.pack(fill="x", pady=(18, 0))
+        self._zone = zone
 
         ctk.CTkLabel(zone, text="⤓", font=font(22), text_color=COLORS.muted).pack(
             pady=(18, 0)
         )
-        ctk.CTkLabel(
+        self._zone_label = ctk.CTkLabel(
             zone,
             text=self.t("send.drop_here"),
             font=font(13),
             text_color=COLORS.text,
-        ).pack(pady=(6, 0))
+        )
+        self._zone_label.pack(pady=(6, 0))
 
         buttons = ctk.CTkFrame(zone, fg_color="transparent")
         buttons.pack(pady=(14, 20))
@@ -76,6 +79,26 @@ class SendView(TransferScreen):
         quiet_button(
             buttons, self.t("send.choose_files"), self._choose_files, width=140
         ).pack(side="left", padx=(10, 0))
+
+        # Registered last: the buttons have to exist to be registered
+        # too, or a drop onto one of them goes nowhere.
+        droppable = accept_files(
+            zone, self._dropped, self._highlight_zone, self._plain_zone
+        )
+        if not droppable:
+            self._zone_label.configure(text=self.t("send.pick_here"))
+
+    def _dropped(self, paths: list[Path]) -> None:
+        if self.window.transfer_running:
+            return
+        self.window.send_paths = paths
+        self._refresh_selection()
+
+    def _highlight_zone(self) -> None:
+        self._zone.configure(border_color=self.accent.color, fg_color=COLORS.panel)
+
+    def _plain_zone(self) -> None:
+        self._zone.configure(border_color=COLORS.border, fg_color=COLORS.well)
 
     def _selection_row(self, parent: ctk.CTkFrame) -> None:
         row = ctk.CTkFrame(parent, fg_color="transparent")

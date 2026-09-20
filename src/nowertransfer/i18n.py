@@ -156,6 +156,11 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "Drag files or a folder here",
         "de": "Dateien oder Ordner hierher ziehen",
     },
+    #: Shown instead of send.drop_here where tkdnd will not load.
+    "send.pick_here": {
+        "en": "Choose files or a folder to send",
+        "de": "Dateien oder Ordner zum Senden auswählen",
+    },
     "send.entropy": {"en": "{bits} bits of entropy", "de": "{bits} Bit Entropie"},
     "send.recipient_needs": {
         "en": "The recipient needs nothing but the code phrase.",

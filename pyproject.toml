@@ -25,7 +25,10 @@ classifiers = [
 ]
 # Floor is what the UI is actually developed and verified against, not
 # the oldest release that might happen to work.
-dependencies = ["customtkinter>=6.0"]
+# tkinterdnd2 carries the tkdnd Tcl extension that lets the send screen
+# take dropped files. The app runs without it; the drop zone then just
+# asks for a click (see ui/dnd.py).
+dependencies = ["customtkinter>=6.0", "tkinterdnd2>=0.4"]
 
 # Development tools. A group rather than an optional extra: these are
 # not something anyone installing the app should be offered, and `uv

@@ -226,6 +226,44 @@ def test_the_code_on_screen_is_the_one_that_will_be_sent(ui):
 
 
 # ----------------------------------------------------------------------
+#  Dropped files
+# ----------------------------------------------------------------------
+def test_a_tcl_file_list_splits_into_paths(ui):
+    # tkdnd hands over one string in Tcl list syntax, so a path with a
+    # space in it arrives in braces and must not be split on the space.
+    from nowertransfer.ui.dnd import _parse
+
+    paths = _parse(ui.window, "{C:/holiday photos/one.jpg} C:/two.txt")
+
+    assert [p.name for p in paths] == ["one.jpg", "two.txt"]
+    assert paths[0].parent.name == "holiday photos"
+
+
+def test_dropping_files_selects_them(ui, tmp_path):
+    view = ui.open("send")
+    dropped = tmp_path / "dropped.bin"
+    dropped.write_bytes(b"x")
+
+    view._dropped([dropped])
+    settle(ui.window)
+
+    assert ui.window.send_paths == [dropped]
+    assert dropped.name in view._selection_label.cget("text")
+
+
+def test_a_drop_during_a_transfer_is_ignored(ui, tmp_path, monkeypatch):
+    # Swapping the selection out from under a running croc would send
+    # one set of files under a code phrase handed out for another.
+    view = ui.open("send")
+    ui.window.send_paths = [tmp_path / "chosen"]
+    monkeypatch.setattr(type(ui.window), "transfer_running", property(lambda _: True))
+
+    view._dropped([tmp_path / "late"])
+
+    assert ui.window.send_paths == [tmp_path / "chosen"]
+
+
+# ----------------------------------------------------------------------
 #  Settings
 # ----------------------------------------------------------------------
 def select(view, mode: RelayMode) -> None:
