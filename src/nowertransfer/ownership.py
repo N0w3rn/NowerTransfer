@@ -7,14 +7,18 @@ readable by every other account the folder is shared with. Measured on
 a real machine: a second local account had full control of the app's
 settings directory.
 
-So on Windows the list is rewritten instead - inheritance off, one
-entry for the current user's SID and nothing else.
+Windows therefore gets a new list rather than an edited one. Editing
+is what ``icacls /inheritance:r`` does, and it only drops entries that
+were *inherited* - explicit entries for SYSTEM or Administrators
+survive it, which is how a first attempt at this passed on one machine
+and left three extra accounts in place on another. ``SetNamedSecurityInfo``
+with a protected DACL replaces the list outright, so what is granted is
+exactly what is written here and nothing else.
 """
 
 from __future__ import annotations
 
 import ctypes
-import subprocess
 import sys
 from contextlib import suppress
 from ctypes import c_void_p, wintypes
@@ -23,13 +27,24 @@ from pathlib import Path
 _TOKEN_QUERY = 0x0008
 _TOKEN_USER = 1
 
-_NO_WINDOW = (
-    getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
-)
+_SE_FILE_OBJECT = 1
+_DACL_SECURITY_INFORMATION = 0x00000004
+#: Stops the parent's entries from flowing back in.
+_PROTECTED_DACL_SECURITY_INFORMATION = 0x80000000
+
+_ACL_REVISION = 2
+_FILE_ALL_ACCESS = 0x001F01FF
+_OBJECT_INHERIT_ACE = 0x1
+_CONTAINER_INHERIT_ACE = 0x2
+
+#: One ACE never needs this much, and over-allocating costs nothing.
+_ACL_BYTES = 1024
+
+_ERROR_SUCCESS = 0
 
 
 def restrict_to_owner(path: Path) -> bool:
-    """Let only the current account read ``path``. False if it could not."""
+    """Let only the current account reach ``path``. False if it could not."""
     if sys.platform != "win32":
         # 0o700 on a directory: 0o600 would make it untraversable.
         mode = 0o700 if path.is_dir() else 0o600
@@ -37,40 +52,45 @@ def restrict_to_owner(path: Path) -> bool:
             path.chmod(mode)
             return True
         return False
-
-    sid = current_user_sid()
-    if sid is None:
-        return False
-    # (OI)(CI) makes a directory's entry apply to what is created in it,
-    # which is what protects the files this app writes later.
-    rights = "(OI)(CI)(F)" if path.is_dir() else "(F)"
-    try:
-        result = subprocess.run(
-            [
-                "icacls",
-                str(path),
-                "/inheritance:r",
-                "/grant:r",
-                f"*{sid}:{rights}",
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=_NO_WINDOW,
-            check=False,
-            timeout=20,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return False
-    return result.returncode == 0
+    return _set_sole_owner(path)
 
 
 def current_user_sid() -> str | None:
-    """The SID of the account this process runs as, as a string."""
+    """The SID of the account this process runs as, in string form."""
     if sys.platform != "win32":
         return None
     try:
+        with _token_sid() as sid:
+            if sid is None:
+                return None
+            text = ctypes.c_wchar_p()
+            advapi32 = ctypes.windll.advapi32
+            advapi32.ConvertSidToStringSidW.argtypes = [
+                c_void_p,
+                ctypes.POINTER(ctypes.c_wchar_p),
+            ]
+            if not advapi32.ConvertSidToStringSidW(sid, ctypes.byref(text)):
+                return None
+            try:
+                return text.value
+            finally:
+                ctypes.windll.kernel32.LocalFree(text)
+    except (AttributeError, OSError, ValueError):
+        return None
+
+
+# ----------------------------------------------------------------------
+#  Windows
+# ----------------------------------------------------------------------
+if sys.platform == "win32":  # pragma: no cover - platform specific
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _token_sid():
+        """The current process's user SID, valid inside the block."""
         advapi32 = ctypes.windll.advapi32
         kernel32 = ctypes.windll.kernel32
+        kernel32.GetCurrentProcess.restype = c_void_p
         advapi32.OpenProcessToken.argtypes = [
             c_void_p,
             wintypes.DWORD,
@@ -83,18 +103,13 @@ def current_user_sid() -> str | None:
             wintypes.DWORD,
             ctypes.POINTER(wintypes.DWORD),
         ]
-        advapi32.ConvertSidToStringSidW.argtypes = [
-            c_void_p,
-            ctypes.POINTER(ctypes.c_wchar_p),
-        ]
-        kernel32.GetCurrentProcess.restype = c_void_p
-        kernel32.LocalFree.argtypes = [c_void_p]
 
         token = c_void_p()
         if not advapi32.OpenProcessToken(
             kernel32.GetCurrentProcess(), _TOKEN_QUERY, ctypes.byref(token)
         ):
-            return None
+            yield None
+            return
         try:
             size = wintypes.DWORD()
             advapi32.GetTokenInformation(
@@ -104,19 +119,78 @@ def current_user_sid() -> str | None:
             if not advapi32.GetTokenInformation(
                 token, _TOKEN_USER, buffer, size, ctypes.byref(size)
             ):
-                return None
-
-            # TOKEN_USER begins with a SID_AND_ATTRIBUTES, whose first
-            # member is the pointer we want.
-            sid = ctypes.cast(buffer, ctypes.POINTER(c_void_p)).contents
-            text = ctypes.c_wchar_p()
-            if not advapi32.ConvertSidToStringSidW(sid, ctypes.byref(text)):
-                return None
-            try:
-                return text.value
-            finally:
-                kernel32.LocalFree(text)
+                yield None
+                return
+            # TOKEN_USER starts with a SID_AND_ATTRIBUTES, whose first
+            # member is the pointer wanted here. The buffer backing it
+            # stays alive for the body of the with-block.
+            yield ctypes.cast(buffer, ctypes.POINTER(c_void_p)).contents
         finally:
             kernel32.CloseHandle(token)
-    except (AttributeError, OSError, ValueError):
-        return None
+
+    def _set_sole_owner(path: Path) -> bool:
+        try:
+            advapi32 = ctypes.windll.advapi32
+            advapi32.InitializeAcl.argtypes = [
+                c_void_p,
+                wintypes.DWORD,
+                wintypes.DWORD,
+            ]
+            advapi32.AddAccessAllowedAceEx.argtypes = [
+                c_void_p,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                c_void_p,
+            ]
+            advapi32.SetNamedSecurityInfoW.argtypes = [
+                wintypes.LPWSTR,
+                ctypes.c_int,
+                wintypes.DWORD,
+                c_void_p,
+                c_void_p,
+                c_void_p,
+                c_void_p,
+            ]
+            advapi32.SetNamedSecurityInfoW.restype = wintypes.DWORD
+
+            with _token_sid() as sid:
+                if sid is None:
+                    return False
+
+                acl = ctypes.create_string_buffer(_ACL_BYTES)
+                if not advapi32.InitializeAcl(acl, _ACL_BYTES, _ACL_REVISION):
+                    return False
+
+                # A directory passes the entry on to what is created in
+                # it, which is how the files written later are covered.
+                flags = (
+                    _OBJECT_INHERIT_ACE | _CONTAINER_INHERIT_ACE if path.is_dir() else 0
+                )
+                if not advapi32.AddAccessAllowedAceEx(
+                    acl, _ACL_REVISION, flags, _FILE_ALL_ACCESS, sid
+                ):
+                    return False
+
+                result = advapi32.SetNamedSecurityInfoW(
+                    str(path),
+                    _SE_FILE_OBJECT,
+                    _DACL_SECURITY_INFORMATION | _PROTECTED_DACL_SECURITY_INFORMATION,
+                    None,
+                    None,
+                    acl,
+                    None,
+                )
+                return result == _ERROR_SUCCESS
+        except (AttributeError, OSError, ValueError):
+            return False
+
+else:  # pragma: no cover - platform specific
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _token_sid():
+        yield None
+
+    def _set_sole_owner(path: Path) -> bool:
+        return False

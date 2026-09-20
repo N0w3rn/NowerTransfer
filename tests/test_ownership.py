@@ -75,6 +75,40 @@ def test_a_restricted_directory_passes_it_on(tmp_path):
     assert "(OI)" in granted[0] and "(CI)" in granted[0], granted
 
 
+#: Local System, spelled as a SID so no test depends on the language
+#: Windows is installed in.
+_SYSTEM_SID = "S-1-5-18"
+
+
+@windows_only
+@pytest.mark.parametrize("kind", ["file", "directory"])
+def test_entries_granted_outright_are_removed_too(tmp_path, kind):
+    # This is the fault that shipped. CI's temporary directory grants
+    # SYSTEM and Administrators outright rather than by inheritance,
+    # and the first attempt used `icacls /inheritance:r`, which only
+    # drops *inherited* entries. It reported success and left three
+    # other accounts with full control.
+    target = tmp_path / kind
+    if kind == "directory":
+        target.mkdir()
+    else:
+        target.write_text("{}", encoding="utf-8")
+
+    subprocess.run(
+        ["icacls", str(target), "/grant", f"*{_SYSTEM_SID}:(F)"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert len(entries_of(target)) > 1, "the fixture did not add an entry"
+
+    assert restrict_to_owner(target)
+
+    granted = entries_of(target)
+    assert len(granted) == 1, f"expected one entry, got {granted}"
+    assert _SYSTEM_SID not in acl_of(target)
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="the POSIX path")
 def test_elsewhere_it_falls_back_to_the_mode(tmp_path):
     secret = tmp_path / "session.json"
