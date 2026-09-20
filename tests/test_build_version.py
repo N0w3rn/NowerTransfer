@@ -99,6 +99,14 @@ def test_the_resource_carries_publisher_and_version():
     assert "OriginalFilename', 'NowerTransfer.exe'" in resource
 
 
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    # PyInstaller's versioninfo module imports pefile, which is a
+    # Windows-only dependency and simply absent elsewhere. The
+    # resource is written on Windows only too, so there is nothing to
+    # check on the other platforms.
+    reason="PyInstaller's version resource parser needs pefile, Windows only",
+)
 def test_the_resource_is_valid_python_for_pyinstaller():
     # PyInstaller evaluates this file, so a typo is a build failure.
     from PyInstaller.utils.win32.versioninfo import (  # noqa: F401
