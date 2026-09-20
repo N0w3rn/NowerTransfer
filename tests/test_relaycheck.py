@@ -58,7 +58,7 @@ def test_an_unconfigured_relay_is_unreachable():
 def test_a_dead_relay_is_unreachable():
     result = check(RelayEndpoint("127.0.0.1:1"), None)
     assert result.status is RelayStatus.UNREACHABLE
-    assert result.ok is False
+    assert result.milliseconds is None
 
 
 def test_without_croc_it_reports_reachability_only(listening_port):

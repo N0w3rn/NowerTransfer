@@ -60,12 +60,6 @@ def hint(master: ctk.CTkBaseClass, text: str, width: int = 520) -> ctk.CTkLabel:
     )
 
 
-def heading(master: ctk.CTkBaseClass, text: str, size: int = 19) -> ctk.CTkLabel:
-    return ctk.CTkLabel(
-        master, text=text, font=display(size), text_color=COLORS.text, anchor="w"
-    )
-
-
 def primary_button(
     master: ctk.CTkBaseClass,
     text: str,
@@ -159,19 +153,19 @@ class IconButton(ctk.CTkFrame):
     display scaling.
     """
 
+    SIZE = 30
+    ICON_SIZE = 18
+
     def __init__(
         self,
         master: ctk.CTkBaseClass,
         name: str,
         command: Callable[[], None],
-        *,
-        size: int = 30,
-        icon_size: int = 18,
     ) -> None:
         super().__init__(
             master,
-            width=size,
-            height=size,
+            width=self.SIZE,
+            height=self.SIZE,
             corner_radius=9,
             fg_color=COLORS.panel,
         )
@@ -181,7 +175,7 @@ class IconButton(ctk.CTkFrame):
         self._icon = Icon(
             self,
             name,
-            size=icon_size,
+            size=self.ICON_SIZE,
             color=COLORS.muted,
             background=COLORS.panel,
         )
@@ -214,14 +208,12 @@ class Segmented(ctk.CTkSegmentedButton):
         master: ctk.CTkBaseClass,
         values: list[str],
         command: Callable[[str], None] | None = None,
-        *,
-        height: int = 36,
     ) -> None:
         super().__init__(
             master,
             values=values,
             command=command,
-            height=height,
+            height=36,
             corner_radius=10,
             font=font(12),
             fg_color=COLORS.well,
@@ -244,23 +236,26 @@ class Segmented(ctk.CTkSegmentedButton):
             self._buttons_dict[value].configure(text_color=COLORS.text)
 
 
-def badge(
-    master: ctk.CTkBaseClass,
-    name: str,
-    *,
-    filled: bool,
-    size: int = 42,
-) -> ctk.CTkFrame:
+#: The role badge on the start screen, and the icon inside it.
+BADGE_SIZE = 42
+BADGE_ICON_SIZE = 24
+
+
+def badge(master: ctk.CTkBaseClass, name: str, *, filled: bool) -> ctk.CTkFrame:
     """The rounded square holding a role's icon on the start screen."""
     background = COLORS.gold if filled else COLORS.panel_hover
     holder = ctk.CTkFrame(
-        master, width=size, height=size, corner_radius=12, fg_color=background
+        master,
+        width=BADGE_SIZE,
+        height=BADGE_SIZE,
+        corner_radius=12,
+        fg_color=background,
     )
     holder.pack_propagate(False)
     Icon(
         holder,
         name,
-        size=size - 18,
+        size=BADGE_ICON_SIZE,
         color=COLORS.ink if filled else COLORS.gold,
         background=background,
         width=2.4,

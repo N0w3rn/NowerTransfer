@@ -23,8 +23,6 @@ _SM_CXSMICON, _SM_CYSMICON = 49, 50
 
 _IMAGE_ICON = 1
 _LR_LOADFROMFILE = 0x00000010
-#: Without this, LoadImage returns a shared handle it also owns.
-_LR_DEFAULTCOLOR = 0x00000000
 
 _WM_SETICON = 0x0080
 _ICON_SMALL, _ICON_BIG = 0, 1
@@ -91,7 +89,7 @@ def apply_icon(window, icon: Path) -> bool:
                 _IMAGE_ICON,
                 user32.GetSystemMetrics(cx_metric),
                 user32.GetSystemMetrics(cy_metric),
-                _LR_LOADFROMFILE | _LR_DEFAULTCOLOR,
+                _LR_LOADFROMFILE,
             )
             if not loaded:
                 continue

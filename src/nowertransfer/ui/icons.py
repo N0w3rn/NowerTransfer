@@ -81,7 +81,6 @@ class Icon(ctk.CTkCanvas):
         self._name = name
         self._color = color
         self._width = width
-        self._pixels = pixels
         self._scale = pixels / GRID
         self._draw()
 
@@ -95,7 +94,6 @@ class Icon(ctk.CTkCanvas):
                 width=max(1.0, self._width * self._scale),
                 capstyle="round",
                 joinstyle="round",
-                smooth=False,
             )
 
     def recolour(self, color: str, background: str | None = None) -> None:

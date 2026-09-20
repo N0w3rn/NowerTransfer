@@ -52,10 +52,6 @@ class RelayCheck:
     milliseconds: int | None = None
     detail: str = ""
 
-    @property
-    def ok(self) -> bool:
-        return self.status is RelayStatus.REACHABLE
-
 
 def split_host_port(host: str) -> tuple[str, int]:
     """``host:port`` into its parts, bracketed IPv6 included."""

@@ -13,7 +13,7 @@ import sys
 
 import pytest
 
-from nowertransfer.ownership import current_user_sid, restrict_to_owner
+from nowertransfer.ownership import restrict_to_owner
 
 windows_only = pytest.mark.skipif(
     sys.platform != "win32", reason="access control lists are a Windows thing"
@@ -38,13 +38,6 @@ def entries_of(path) -> list[str]:
     """
     listing = acl_of(path).replace(str(path), "")
     return [line.strip() for line in listing.splitlines() if ":(" in line]
-
-
-@windows_only
-def test_the_current_account_has_a_sid():
-    sid = current_user_sid()
-    assert sid is not None
-    assert sid.startswith("S-1-"), sid
 
 
 @windows_only

@@ -55,30 +55,6 @@ def restrict_to_owner(path: Path) -> bool:
     return _set_sole_owner(path)
 
 
-def current_user_sid() -> str | None:
-    """The SID of the account this process runs as, in string form."""
-    if sys.platform != "win32":
-        return None
-    try:
-        with _token_sid() as sid:
-            if sid is None:
-                return None
-            text = ctypes.c_wchar_p()
-            advapi32 = ctypes.windll.advapi32
-            advapi32.ConvertSidToStringSidW.argtypes = [
-                c_void_p,
-                ctypes.POINTER(ctypes.c_wchar_p),
-            ]
-            if not advapi32.ConvertSidToStringSidW(sid, ctypes.byref(text)):
-                return None
-            try:
-                return text.value
-            finally:
-                ctypes.windll.kernel32.LocalFree(text)
-    except (AttributeError, OSError, ValueError):
-        return None
-
-
 # ----------------------------------------------------------------------
 #  Windows
 # ----------------------------------------------------------------------

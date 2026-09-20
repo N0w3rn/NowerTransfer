@@ -62,9 +62,6 @@ def user_config_dir() -> Path:
     return base / APP_NAME
 
 
-ICON_NAME = "icon.ico"
-
-
 def icon_path() -> Path | None:
     """The window icon, bundled into a build or read from ``assets/``."""
     return asset("icon.ico")
@@ -132,8 +129,11 @@ def write_atomic(path: Path, text: str, *, private: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
     if private:
-        # The directory first: a file inherits from it, and the
-        # temporary below is created inside it.
+        # The directory first, because the temporary file is created
+        # inside it and inherits from it on Windows. The file is then
+        # restricted in its own right: that is what carries the mode on
+        # Linux and macOS, and on Windows it still holds if the
+        # directory could not be changed.
         restrict_to_owner(path.parent)
         temporary.touch(exist_ok=True)
         restrict_to_owner(temporary)
