@@ -49,9 +49,21 @@ class ReceiveView(TransferScreen):
         """
         resumed = self.options.get("resume_code")
         if isinstance(resumed, str) and resumed:
-            self._code_entry.insert(0, resumed)
+            self._fill_code(resumed)
             return
         self._offer_the_clipboard()
+
+    def _fill_code(self, code: str) -> None:
+        """Put a phrase in the field, selected.
+
+        Selected because it was not asked for: whoever wanted a
+        different phrase types it and the offered one goes, rather
+        than the new text landing on the end of the old.
+        """
+        self._code_entry.delete(0, "end")
+        self._code_entry.insert(0, code)
+        self._code_entry.select_range(0, "end")
+        self._code_entry.icursor("end")
 
     def _offer_the_clipboard(self) -> None:
         """Fill the field if the clipboard holds one of our phrases.
@@ -71,7 +83,7 @@ class ReceiveView(TransferScreen):
         except tkinter.TclError:
             return  # empty, or holding something that is not text
         if is_our_code(pasted):
-            self._code_entry.insert(0, pasted.strip().lower())
+            self._fill_code(pasted.strip().lower())
 
     def _target_row(self, parent: ctk.CTkFrame) -> None:
         card = ctk.CTkFrame(parent, fg_color=COLORS.panel, corner_radius=RADIUS)
