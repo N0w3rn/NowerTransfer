@@ -63,6 +63,9 @@ _VERSION_MISMATCH_MARKERS = (
 #: string. That phrase is the encryption key, so it stays out of the log.
 _HIDDEN_OUTPUT = ("getcroc.com",)
 
+#: The relay password as croc echoes it: `--pass <value>`.
+_PASS_FLAG_PATTERN = re.compile(r"(--pass\s+)\S+")
+
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
 
@@ -105,6 +108,17 @@ def parse_incoming(line: str) -> tuple[str, str] | None:
 def is_hidden_output(line: str) -> bool:
     """True for croc output that must not reach the UI."""
     return any(marker in line for marker in _HIDDEN_OUTPUT)
+
+
+def redact(line: str) -> str:
+    """Mask secrets croc prints back at us.
+
+    croc spells out the command for the other side, relay password and
+    all. The settings screen masks that password, so the transfer log
+    must not undo it - a screenshot of a transfer would otherwise hand
+    the relay over.
+    """
+    return _PASS_FLAG_PATTERN.sub(r"\g<1>••••••", line)
 
 
 def looks_like_config_error(line: str) -> bool:
@@ -320,6 +334,7 @@ class TransferWorker:
         for line in iter_output_lines(self._process.stdout):
             if is_hidden_output(line):
                 continue
+            line = redact(line)
             self._last_line = line
             self._emit(EventType.OUTPUT, line)
         return self._process.wait()

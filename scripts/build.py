@@ -174,7 +174,7 @@ def pyinstaller_command(
 
     # Everything the UI loads at runtime: the window icon and the logo
     # the start screen draws.
-    for name in ("icon.ico", "logo-40.png", "logo-88.png"):
+    for name in ("icon.ico", "logo-88.png"):
         asset = ASSETS_DIR / name
         if asset.exists():
             command += ["--add-data", f"{asset}{separator}."]

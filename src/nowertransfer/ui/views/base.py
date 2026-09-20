@@ -13,8 +13,9 @@ from typing import TYPE_CHECKING
 import customtkinter as ctk
 
 from ...transfer import EventType, TransferEvent, parse_incoming, parse_progress
+from ..icons import Icon
 from ..theme import COLORS, GAP, NEUTRAL_ACCENT, Accent, display, font
-from ..widgets import TransferPanel, icon_button, link_button, primary_button
+from ..widgets import IconButton, TransferPanel, primary_button
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle only exists for typing
     from ..main_window import MainWindow
@@ -49,19 +50,28 @@ class View(ctk.CTkFrame):
 
     # -- chrome --------------------------------------------------------
     def title_bar(
-        self, title: str, glyph: str = "", *, back: bool = True
+        self, title: str, icon: str = "", *, back: bool = True
     ) -> ctk.CTkFrame:
-        """The row every screen but the start screen begins with."""
+        """The row every screen but the start screen begins with.
+
+        The arrow at the left is the only way back: a second one at the
+        foot of the screen said the same thing twice.
+        """
         bar = ctk.CTkFrame(self, fg_color="transparent")
         bar.pack(fill="x")
         if back:
-            icon_button(bar, "‹", self.window.show_home).pack(side="left")
-        if glyph:
-            ctk.CTkLabel(
-                bar, text=glyph, font=font(15, bold=True), text_color=COLORS.gold
+            self.back_button = IconButton(bar, "chevron_left", self.window.show_home)
+            self.back_button.pack(side="left")
+        if icon:
+            Icon(
+                bar,
+                icon,
+                size=20,
+                color=COLORS.gold,
+                background=COLORS.background,
             ).pack(side="left", padx=(12, 6))
         ctk.CTkLabel(bar, text=title, font=display(19), text_color=COLORS.text).pack(
-            side="left", padx=(6 if glyph else 12, 0)
+            side="left", padx=(6 if icon else 12, 0)
         )
         return bar
 
@@ -109,9 +119,6 @@ class TransferScreen(View):
         self._retries = 0
         self._started_at: float | None = None
         self._tick_job: str | None = None
-
-        self.back_button = link_button(self, self.t("nav.back"), self.window.show_home)
-        self.back_button.pack(side="bottom", anchor="w", pady=(GAP, 0))
 
         self.footnote = ctk.CTkLabel(
             self,

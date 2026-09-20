@@ -160,23 +160,52 @@ def test_no_widget_is_squeezed_out_of_the_layout(ui, screen, language, size):
 @pytest.mark.parametrize("screen", ["send", "receive", "settings"])
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_every_screen_has_a_visible_way_back(ui, screen, language):
-    # The back link rendered one pixel high on two screens, which is
-    # indistinguishable from not being there at all.
+    # The back control rendered one pixel high on two screens, which is
+    # indistinguishable from not being there at all. It is now the arrow
+    # in the title bar, and it is the only one.
+    from nowertransfer.ui.widgets import IconButton
+
     view = ui.open(screen, language=language, size=SIZES[1])
+    back = view.back_button
+
+    assert isinstance(back, IconButton)
+    assert back.winfo_ismapped(), f"{screen} [{language}]: back button not placed"
+    assert back.winfo_height() >= MIN_VISIBLE_PX, (
+        f"{screen} [{language}]: back button is {back.winfo_height()}px high"
+    )
+    assert back.winfo_width() >= MIN_VISIBLE_PX
+
+
+@pytest.mark.parametrize("screen", ["send", "receive", "settings"])
+def test_no_screen_offers_two_ways_back(ui, screen):
+    # The footer link said the same thing as the arrow above it.
+    view = ui.open(screen, size=SIZES[1])
     back = ui.window.t("nav.back")
-    exits = [
+    duplicates = [
         child
         for child in view.winfo_children()
-        if isinstance(child, ctk.CTkButton)
-        and child.cget("text") == back
-        and child.winfo_height() >= MIN_VISIBLE_PX
+        if isinstance(child, ctk.CTkButton) and child.cget("text") == back
     ]
-    assert exits, f"{screen} [{language}] has no visible back button"
+    assert not duplicates, f"{screen} still has a second back button"
 
 
 def test_the_first_run_screen_builds(ui):
     view = ui.open("home", configured=False)
     assert not ui.collapsed(view)
+
+
+@pytest.mark.parametrize("screen", SCREENS)
+def test_building_a_screen_warns_about_nothing(ui, screen):
+    # The start screen used to hand CTkLabel a tkinter.PhotoImage,
+    # which warns on every run and does not scale on a HiDPI display.
+    # A warning printed at every start is one nobody reads.
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        ui.open(screen)
+
+    assert not caught, [f"{w.category.__name__}: {w.message}" for w in caught]
 
 
 # ----------------------------------------------------------------------
@@ -318,6 +347,54 @@ def test_the_relay_fields_are_locked_for_the_public_relay(ui):
     # Disabling alone changes nothing on screen for a CTkEntry, so the
     # dimming is applied by hand and has to actually happen.
     assert view._host_entry.cget("text_color") != locked_colour
+
+
+def test_the_connection_test_uses_what_is_typed_not_what_is_saved(ui, monkeypatch):
+    # Otherwise the button would test the old relay while the user
+    # looks at the new one and believes the answer applies to it.
+    from nowertransfer.relaycheck import RelayCheck, RelayStatus
+    from nowertransfer.ui.views import settings as settings_view
+
+    asked = []
+    monkeypatch.setattr(
+        settings_view,
+        "check",
+        lambda relay, croc: asked.append(relay) or RelayCheck(RelayStatus.REACHABLE, 5),
+    )
+
+    view = ui.open("settings")
+    select(view, RelayMode.OWN)
+    for field, value in (
+        (view._host_entry, "typed-only.example.com:9009"),
+        (view._password_entry, "typed-only-password"),
+    ):
+        field.delete(0, "end")
+        field.insert(0, value)
+
+    view._run_check()
+    settle(ui.window)
+
+    assert asked, "the check was never run"
+    assert asked[0].host == "typed-only.example.com:9009"
+    assert asked[0].password == "typed-only-password"
+
+
+def test_the_connection_test_does_not_claim_the_password_is_right(ui, monkeypatch):
+    # Measured against a real relay: croc names a refused relay
+    # password sometimes at once and sometimes never, so a clean run
+    # proves the address and nothing more.
+    from nowertransfer.relaycheck import RelayCheck, RelayStatus
+    from nowertransfer.ui.views import settings as settings_view
+
+    monkeypatch.setattr(
+        settings_view, "check", lambda relay, croc: RelayCheck(RelayStatus.REACHABLE, 7)
+    )
+    view = ui.open("settings", language="en")
+    view._run_check()
+    settle(ui.window)
+
+    said = view._check_status._label.cget("text").lower()
+    assert "password not checked" in said, said
 
 
 def test_locking_the_relay_fields_keeps_what_was_typed(ui):

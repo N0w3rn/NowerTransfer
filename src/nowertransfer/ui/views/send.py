@@ -14,6 +14,7 @@ from ...codes import code_entropy_bits, generate_code
 from ...paths import human_size, total_size
 from ...session import clear_send_session, save_send_session
 from ..dnd import accept_files
+from ..icons import Icon
 from ..theme import COLORS, GAP, PAD_CARD, RADIUS_LARGE, SEND_ACCENT, font, mono
 from ..widgets import Card, caption, link_button, quiet_button
 from .base import TransferScreen
@@ -26,7 +27,7 @@ class SendView(TransferScreen):
     accent = SEND_ACCENT
 
     def build(self) -> None:
-        bar = self.title_bar(self.t("home.send.title"), "▲")
+        bar = self.title_bar(self.t("home.send.title"), "upload")
         ctk.CTkLabel(
             bar, text=self.t("send.step"), font=font(11), text_color=COLORS.faint
         ).pack(side="right")
@@ -51,7 +52,7 @@ class SendView(TransferScreen):
         zone.pack(fill="x", pady=(18, 0))
         self._zone = zone
 
-        ctk.CTkLabel(zone, text="⤓", font=font(22), text_color=COLORS.muted).pack(
+        Icon(zone, "drop", size=30, color=COLORS.muted, background=COLORS.well).pack(
             pady=(18, 0)
         )
         self._zone_label = ctk.CTkLabel(

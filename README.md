@@ -77,11 +77,18 @@ At runtime the app resolves each value through four layers, later wins:
 | environment | `NOWERTRANSFER_RELAY`, `NOWERTRANSFER_RELAY_PASSWORD` | CI and scripted runs |
 
 The settings screen shows which layer each value came from, and has a
-**Test connection** button: it reports whether the relay answers and how
-long that took, and names a refused relay password when croc refuses
-one. It will not claim a password is correct — croc only reports a
-refusal reliably once, so silence is not proof. The last three layers
-live on the user's machine and never appear in this repository.
+**Test connection** button. It tests the *address*: whether the relay
+answers, and how long that took.
+
+It deliberately does not test the password, and says so on screen.
+Measured against a real relay: croc reports a refused relay password
+at 0.1 s in one run and never in the next, for the same wrong password
+— so a clean result would mean nothing, and reporting it as success
+would be worse than reporting nothing. A wrong password surfaces on
+the first real transfer, which does say so plainly.
+
+The last three layers live on the user's machine and never appear in
+this repository.
 
 ### Which relay
 
@@ -207,10 +214,12 @@ src/nowertransfer/
   transfer.py   subprocess handling, retries, output parsing
   i18n.py       German / English catalogue
   relaycheck.py the settings screen's connection test
-  ui/           theme, fonts, widgets, drag and drop, one module per screen
+  ui/           theme, fonts, icons, widgets, drag and drop,
+                one module per screen
 scripts/
   build.py         builds the executable, bakes in the relay
   make_installer.py wraps it in an Inno Setup installer
+  make_icon.py     renders assets/icon.ico from the logo
   fetch_croc.py    downloads croc from its GitHub releases
 installer/
   NowerTransfer.iss the setup script
@@ -221,6 +230,14 @@ assets/
 No secrets are committed, and `croc` is not: it is fetched at build time,
 pinned to one release in `scripts/fetch_croc.py` and verified against the
 SHA-256 that release publishes.
+
+The window's own icons — the arrows, the back chevron, the drop tray —
+are not images at all: `ui/icons.py` strokes them onto a canvas from
+coordinates, so they stay sharp at any display scaling and take the
+colour of whatever they sit on. `scripts/make_icon.py` renders
+`assets/icon.ico` from the logo at every size Windows asks for, each
+one drawn from the full-size original rather than scaled down from the
+next size up, which is what makes a taskbar icon look smeared.
 
 `assets/` holds the logo and icon, which are the app's own, and
 `assets/fonts/` the two faces it draws with — [Space

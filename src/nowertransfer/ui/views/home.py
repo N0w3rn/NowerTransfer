@@ -12,7 +12,7 @@ from ...config import RelayMode
 from ...paths import asset
 from ...session import load_send_session
 from ..theme import COLORS, GAP, GOLD_ACCENT, RADIUS, RADIUS_LARGE, display, font, mono
-from ..widgets import Card, StatusDot, hint, link_button, primary_button
+from ..widgets import Card, StatusDot, badge, hint, link_button, primary_button
 from .base import View
 
 
@@ -56,15 +56,22 @@ class HomeView(View):
     def _logo_image(self, parent: ctk.CTkBaseClass) -> None:
         """The mark, when it is there. Never a reason to fail.
 
-        A ready-sized PNG through tkinter's own loader: CTkImage would
-        need Pillow, which nothing else here does.
+        A CTkImage rather than a PhotoImage: it is handed a source
+        larger than it draws and picks the right pixel size for the
+        display, so the logo stays sharp where everything else is
+        scaled up too.
         """
-        path = asset("logo-40.png")
+        path = asset("logo-88.png")
         if path is None:
             return
-        with suppress(tkinter.TclError):
-            # Held on the widget: tkinter does not own the image.
-            self._logo = tkinter.PhotoImage(file=str(path))
+        with suppress(tkinter.TclError, OSError):
+            from PIL import Image
+
+            source = Image.open(path)
+            # Held on the widget: nothing else keeps a reference.
+            self._logo = ctk.CTkImage(
+                light_image=source, dark_image=source, size=(40, 40)
+            )
             ctk.CTkLabel(parent, image=self._logo, text="").pack(side="left")
 
     def _role_cards(self) -> None:
@@ -74,10 +81,10 @@ class HomeView(View):
         row.grid_rowconfigure(0, weight=1)
 
         roles = [
-            ("▲", "home.send", self.window.show_send, True),
-            ("▼", "home.receive", self.window.show_receive, False),
+            ("upload", "home.send", self.window.show_send, True),
+            ("download", "home.receive", self.window.show_receive, False),
         ]
-        for column, (glyph, key, command, filled) in enumerate(roles):
+        for column, (icon, key, command, filled) in enumerate(roles):
             title, body = f"{key}.title", f"{key}.body"
             card = ctk.CTkFrame(
                 row,
@@ -95,17 +102,7 @@ class HomeView(View):
                 padx=(0, 9) if column == 0 else (9, 0),
             )
 
-            badge = ctk.CTkLabel(
-                card,
-                text=glyph,
-                width=42,
-                height=42,
-                corner_radius=12,
-                fg_color=COLORS.gold if filled else COLORS.panel_hover,
-                text_color=COLORS.ink if filled else COLORS.gold,
-                font=font(15, bold=True),
-            )
-            badge.pack(anchor="w", padx=20, pady=(20, 0))
+            badge(card, icon, filled=filled).pack(anchor="w", padx=20, pady=(20, 0))
             ctk.CTkLabel(
                 card, text=self.t(title), font=display(19), text_color=COLORS.text
             ).pack(anchor="w", padx=20, pady=(14, 0))

@@ -16,6 +16,7 @@ from nowertransfer.transfer import (
     looks_like_wrong_relay_password,
     parse_incoming,
     parse_progress,
+    redact,
 )
 
 
@@ -122,6 +123,30 @@ def test_the_public_web_receive_url_is_kept_out_of_the_ui():
     assert is_hidden_output("Or open: https://getcroc.com/?code=x")
     assert not is_hidden_output("Sending 'photo.jpg' (2.1 MB)")
     assert not is_hidden_output("could not connect")
+
+
+def test_the_relay_password_is_masked_in_the_log():
+    # croc prints the whole command for the other side. Measured
+    # against a real relay: the line reads
+    #   croc --relay host:9009 --pass <the actual password> <code>
+    # and the details log showed it verbatim, undoing the masking the
+    # settings screen does.
+    line = (
+        "croc --relay ftp.example.com:9009 --pass hunter2secret "
+        "falke-wolke-tiger-83 (code copied to clipboard)"
+    )
+    masked = redact(line)
+
+    assert "hunter2secret" not in masked
+    assert "--pass ••••••" in masked
+    # Everything else survives: the log is there to be read.
+    assert "ftp.example.com:9009" in masked
+    assert "falke-wolke-tiger-83" in masked
+
+
+def test_redacting_leaves_ordinary_output_alone():
+    for line in ("Sending 'photo.jpg' (2.1 MB)", "could not connect", "46%"):
+        assert redact(line) == line
 
 
 def test_output_is_split_on_carriage_returns_too():

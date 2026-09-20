@@ -18,7 +18,7 @@ class ReceiveView(TransferScreen):
     accent = RECEIVE_ACCENT
 
     def build(self) -> None:
-        self.title_bar(self.t("home.receive.title"), "▼")
+        self.title_bar(self.t("home.receive.title"), "download")
         area = self.setup_area()
         self._code_field(area)
         self._target_row(area)

@@ -34,7 +34,6 @@ class SettingsView(View):
         #: stays editable in PUBLIC mode.
         self._own_relay_only: list[ctk.CTkBaseClass] = []
 
-        self.back_button = ctk.CTkFrame(self, fg_color="transparent", height=1)
         self._footer()
 
         if not self.window.settings.is_configured:
@@ -49,12 +48,6 @@ class SettingsView(View):
 
     # ------------------------------------------------------------------
     def _footer(self) -> None:
-        from ..widgets import link_button
-
-        link_button(self, self.t("nav.back"), self.window.show_home, width=90).pack(
-            side="bottom", anchor="w", pady=(GAP, 0)
-        )
-
         row = ctk.CTkFrame(self, fg_color="transparent")
         row.pack(side="bottom", fill="x", pady=(GAP, 0))
         primary_button(row, self.t("settings.save"), GOLD_ACCENT, self._save).pack(
@@ -167,19 +160,28 @@ class SettingsView(View):
         card = ctk.CTkFrame(self, fg_color=COLORS.panel, corner_radius=RADIUS)
         card.pack(fill="x", pady=(18, 0))
 
+        row = ctk.CTkFrame(card, fg_color="transparent")
+        row.pack(fill="x")
+
         self._check_button = outline_button(
-            card, self.t("relay.test"), self._run_check, width=150
+            row, self.t("relay.test"), self._run_check, width=150
         )
         self._check_button.pack(side="left", padx=(14, 0), pady=13)
         self._needs_own_relay(self._check_button)
 
-        self._check_status = StatusDot(card, "", COLORS.faint)
+        self._check_status = StatusDot(row, "", COLORS.faint)
         self._check_status.pack(side="left", padx=(14, 0))
 
         self._latency = ctk.CTkLabel(
-            card, text="", font=mono(11), text_color=COLORS.faint
+            row, text="", font=mono(11), text_color=COLORS.faint
         )
         self._latency.pack(side="right", padx=14)
+
+        # Said before the test is run, not only after: the button must
+        # not read as an offer to verify the password.
+        hint(card, self.t("relay.password_unverifiable"), width=600).pack(
+            anchor="w", fill="x", padx=14, pady=(0, 13)
+        )
 
     # ------------------------------------------------------------------
     def _run_check(self) -> None:

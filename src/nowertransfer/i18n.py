@@ -146,7 +146,27 @@ CATALOG: dict[str, dict[str, str]] = {
     "stat.unknown": {"en": "—", "de": "—"},
     "relay.label": {"en": "Relay", "de": "Relay"},
     "relay.checking": {"en": "Checking …", "de": "Wird geprüft …"},
-    "relay.reachable": {"en": "Relay reachable", "de": "Relay erreichbar"},
+    #: Deliberately not "relay ok": the test proves the address, never
+    #: the password. See relaycheck.py for why the password cannot be
+    #: checked reliably.
+    "relay.reachable": {
+        "en": "Address reachable · password not checked",
+        "de": "Adresse erreichbar · Passwort ungeprüft",
+    },
+    "relay.password_unverifiable": {
+        "en": (
+            "Only the address is tested. croc reports a refused relay "
+            "password too unreliably to check it here — a wrong one is "
+            "sometimes named at once and sometimes not at all. If the "
+            "password is wrong, the first transfer says so."
+        ),
+        "de": (
+            "Geprüft wird nur die Adresse. Ein falsches Relay-Passwort "
+            "meldet croc zu unzuverlässig, um es hier zu prüfen — mal "
+            "sofort, mal gar nicht. Stimmt es nicht, sagt es die erste "
+            "Übertragung."
+        ),
+    },
     "relay.unreachable": {"en": "Relay not reachable", "de": "Relay nicht erreichbar"},
     "relay.test": {"en": "Test connection", "de": "Verbindung testen"},
     "home.resume_short": {"en": "Resume", "de": "Fortsetzen"},

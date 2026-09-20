@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 import customtkinter as ctk
 
+from .icons import Icon
 from .theme import (
     COLORS,
     PAD_CARD,
@@ -150,22 +151,76 @@ def link_button(
     )
 
 
-def icon_button(
-    master: ctk.CTkBaseClass, text: str, command: Callable[[], None]
-) -> ctk.CTkButton:
-    """A small square button; ``text`` is a glyph such as an arrow."""
-    return ctk.CTkButton(
-        master,
-        text=text,
-        width=30,
-        height=30,
-        corner_radius=9,
-        fg_color=COLORS.panel,
-        hover_color=COLORS.panel_hover,
-        text_color=COLORS.muted,
-        font=font(14, bold=True),
-        command=command,
+class IconButton(ctk.CTkFrame):
+    """A small square button whose face is a drawn icon.
+
+    Not a CTkButton: that can only show text or a raster image, and
+    these icons are strokes on a canvas so they stay sharp at any
+    display scaling.
+    """
+
+    def __init__(
+        self,
+        master: ctk.CTkBaseClass,
+        name: str,
+        command: Callable[[], None],
+        *,
+        size: int = 30,
+        icon_size: int = 18,
+    ) -> None:
+        super().__init__(
+            master,
+            width=size,
+            height=size,
+            corner_radius=9,
+            fg_color=COLORS.panel,
+        )
+        # Without this the frame shrinks to the canvas and loses its
+        # hit area.
+        self.pack_propagate(False)
+        self._icon = Icon(
+            self,
+            name,
+            size=icon_size,
+            color=COLORS.muted,
+            background=COLORS.panel,
+        )
+        self._icon.pack(expand=True)
+
+        for widget in (self, self._icon):
+            widget.bind("<Button-1>", lambda _event: command())
+            widget.bind("<Enter>", lambda _event: self._hover(True))
+            widget.bind("<Leave>", lambda _event: self._hover(False))
+            widget.configure(cursor="hand2")
+
+    def _hover(self, active: bool) -> None:
+        background = COLORS.panel_hover if active else COLORS.panel
+        self.configure(fg_color=background)
+        self._icon.recolour(COLORS.text if active else COLORS.muted, background)
+
+
+def badge(
+    master: ctk.CTkBaseClass,
+    name: str,
+    *,
+    filled: bool,
+    size: int = 42,
+) -> ctk.CTkFrame:
+    """The rounded square holding a role's icon on the start screen."""
+    background = COLORS.gold if filled else COLORS.panel_hover
+    holder = ctk.CTkFrame(
+        master, width=size, height=size, corner_radius=12, fg_color=background
     )
+    holder.pack_propagate(False)
+    Icon(
+        holder,
+        name,
+        size=size - 18,
+        color=COLORS.ink if filled else COLORS.gold,
+        background=background,
+        width=2.4,
+    ).pack(expand=True)
+    return holder
 
 
 def entry(

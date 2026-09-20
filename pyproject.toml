@@ -28,7 +28,10 @@ classifiers = [
 # tkinterdnd2 carries the tkdnd Tcl extension that lets the send screen
 # take dropped files. The app runs without it; the drop zone then just
 # asks for a click (see ui/dnd.py).
-dependencies = ["customtkinter>=6.0", "tkinterdnd2>=0.4"]
+#
+# Pillow backs CTkImage, which is what keeps the logo sharp on a
+# scaled display; CustomTkinter 6 no longer pulls it in itself.
+dependencies = ["customtkinter>=6.0", "tkinterdnd2>=0.4", "pillow>=10.0"]
 
 # Development tools. A group rather than an optional extra: these are
 # not something anyone installing the app should be offered, and `uv
