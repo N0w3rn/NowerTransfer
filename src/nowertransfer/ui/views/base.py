@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import customtkinter as ctk
 
 from ...transfer import EventType, TransferEvent, parse_incoming, parse_progress
+from .. import winicon
 from ..icons import Icon
 from ..theme import COLORS, GAP, NEUTRAL_ACCENT, Accent, display, font
 from ..widgets import IconButton, TransferPanel, primary_button
@@ -247,6 +248,7 @@ class TransferScreen(View):
             self.panel.set_phase(self.finished_text())
             self._show_finished()
             self.on_finished()
+            self._announce()
         elif event.type is EventType.CANCELLED:
             self.leave_running(completed=False)
             self.window.show_home()
@@ -256,6 +258,18 @@ class TransferScreen(View):
             if event.detail:
                 message = f"{message}\n{event.detail}"
             self.panel.set_phase(message, error=True)
+            self._announce()
+
+    def _announce(self) -> None:
+        """Say the transfer is over, for someone who looked away.
+
+        A transfer is long enough that nobody watches it, and Windows
+        stops the flashing itself as soon as the window is brought
+        forward. Cancelling is not announced: whoever cancelled is
+        already here.
+        """
+        if not winicon.is_foreground(self.window):
+            winicon.flash(self.window)
 
     def _show_finished(self) -> None:
         """Replace the primary action with a way out."""

@@ -367,6 +367,47 @@ def test_the_bundled_faces_are_the_ones_actually_drawn(ui, spec):
 
 
 # ----------------------------------------------------------------------
+#  Saying a transfer is over
+# ----------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("event_type", "should_flash"),
+    [("FINISHED", True), ("FAILED", True), ("CANCELLED", False)],
+)
+def test_the_taskbar_is_flashed_when_nobody_is_watching(
+    ui, monkeypatch, event_type, should_flash
+):
+    from nowertransfer.transfer import EventType, TransferEvent
+    from nowertransfer.ui import winicon
+
+    flashed = []
+    monkeypatch.setattr(winicon, "is_foreground", lambda _window: False)
+    monkeypatch.setattr(winicon, "flash", lambda window: flashed.append(window))
+
+    view = ui.open("send")
+    text = "error.no_peer" if event_type == "FAILED" else ""
+    view.on_transfer_event(TransferEvent(getattr(EventType, event_type), text))
+    settle(ui.window)
+
+    assert bool(flashed) is should_flash
+
+
+def test_no_flashing_at_a_window_already_in_front(ui, monkeypatch):
+    # Flashing the window someone is looking at is just noise.
+    from nowertransfer.transfer import EventType, TransferEvent
+    from nowertransfer.ui import winicon
+
+    flashed = []
+    monkeypatch.setattr(winicon, "is_foreground", lambda _window: True)
+    monkeypatch.setattr(winicon, "flash", lambda window: flashed.append(window))
+
+    view = ui.open("send")
+    view.on_transfer_event(TransferEvent(EventType.FINISHED))
+    settle(ui.window)
+
+    assert not flashed
+
+
+# ----------------------------------------------------------------------
 #  Dropped files
 # ----------------------------------------------------------------------
 def test_a_tcl_file_list_splits_into_paths(ui):

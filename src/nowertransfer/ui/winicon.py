@@ -29,6 +29,11 @@ _ICON_SMALL, _ICON_BIG = 0, 1
 
 _GA_ROOT = 2
 
+#: FlashWindowEx: flash the taskbar button, and keep flashing until
+#: the window comes to the front.
+_FLASHW_TRAY = 0x00000002
+_FLASHW_TIMERNOFG = 0x0000000C
+
 #: Handles stay referenced for the life of the process: the window goes
 #: on using them, and destroying one would blank the icon.
 _keep: list[int] = []
@@ -50,6 +55,63 @@ def _win32():
     user32.GetAncestor.restype = c_void_p
     user32.GetAncestor.argtypes = [c_void_p, c_uint]
     return user32
+
+
+class _FlashInfo(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", c_uint),
+        ("hwnd", c_void_p),
+        ("dwFlags", c_uint),
+        ("uCount", c_uint),
+        ("dwTimeout", c_uint),
+    ]
+
+
+def is_foreground(window) -> bool:
+    """True when this window is the one the user is looking at."""
+    if sys.platform != "win32":
+        return True
+    try:
+        user32 = ctypes.windll.user32
+        user32.GetForegroundWindow.restype = c_void_p
+        user32.GetAncestor.restype = c_void_p
+        user32.GetAncestor.argtypes = [c_void_p, c_uint]
+        handle = user32.GetAncestor(c_void_p(window.winfo_id()), _GA_ROOT)
+        return bool(handle) and handle == user32.GetForegroundWindow()
+    except (AttributeError, OSError, ValueError):
+        # Unknown means "probably looking at it": a flash nobody asked
+        # for is worse than a missing one.
+        return True
+
+
+def flash(window) -> bool:
+    """Flash the taskbar button until the window is brought forward.
+
+    False means the platform would not do it, not that the window was
+    not flashing: FlashWindowEx returns the window's state *before* the
+    call, so its own return value says nothing about whether it worked.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        user32 = ctypes.windll.user32
+        user32.GetAncestor.restype = c_void_p
+        user32.GetAncestor.argtypes = [c_void_p, c_uint]
+        user32.FlashWindowEx.argtypes = [ctypes.POINTER(_FlashInfo)]
+        handle = user32.GetAncestor(c_void_p(window.winfo_id()), _GA_ROOT)
+        if not handle:
+            return False
+        info = _FlashInfo(
+            ctypes.sizeof(_FlashInfo),
+            handle,
+            _FLASHW_TRAY | _FLASHW_TIMERNOFG,
+            0,
+            0,
+        )
+        user32.FlashWindowEx(ctypes.byref(info))
+        return True
+    except (AttributeError, OSError, ValueError):
+        return False
 
 
 def set_app_id(app_id: str) -> bool:
