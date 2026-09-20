@@ -340,10 +340,16 @@ class Collapsible(ctk.CTkFrame):
             self.body.pack_forget()
 
 
+#: What a figure shows before anything has reported one.
+UNKNOWN_STAT = "—"
+
+
 class Stat(ctk.CTkFrame):
     """One labelled figure in the transfer screen's row of three."""
 
-    def __init__(self, master: ctk.CTkBaseClass, label: str, value: str = "—") -> None:
+    def __init__(
+        self, master: ctk.CTkBaseClass, label: str, value: str = UNKNOWN_STAT
+    ) -> None:
         super().__init__(master, fg_color="transparent")
         ctk.CTkLabel(
             self,
@@ -439,6 +445,8 @@ class TransferPanel(ctk.CTkFrame):
         self._log.pack(fill="both", expand=True)
         self._log.configure(state="disabled")
         self._last_logged = ""
+        #: Figures that were actually reported, for the closing line.
+        self._known: dict[str, str] = {}
 
         ctk.CTkFrame(self, fg_color="transparent", height=6).pack()
 
@@ -475,7 +483,17 @@ class TransferPanel(ctk.CTkFrame):
 
     # -- figures and log -----------------------------------------------
     def set_stat(self, key: str, value: str) -> None:
+        self._known[key] = value
         self.stats[key].set(value)
+
+    def stat(self, key: str) -> str:
+        """A figure that was actually reported, or "" if none was.
+
+        The dash a Stat starts with is a placeholder, not a value, and
+        must never reach a sentence built out of these.
+        """
+        value = self._known.get(key, "")
+        return "" if value in ("", UNKNOWN_STAT) else value
 
     def log(self, line: str) -> None:
         # croc repeats identical lines while it waits.

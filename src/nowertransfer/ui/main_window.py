@@ -199,8 +199,10 @@ class MainWindow(ctk.CTk):
             return
         self._relay_job = None
         self.relay_reachable = answered[0]
+        # In place, not a rebuild: redrawing the screen would throw
+        # away whatever the user had focused.
         if isinstance(self._view, HomeView):
-            self._rebuild()
+            self._view.show_relay_state()
 
     # ------------------------------------------------------------------
     #  Navigation

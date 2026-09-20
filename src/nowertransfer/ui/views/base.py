@@ -250,10 +250,13 @@ class TransferScreen(View):
             # Opted into, but never silent.
             self.panel.set_phase(self.t("status.fell_back"), error=True)
         elif event.type is EventType.FINISHED:
+            # Read before leave_running, which stops the clock.
+            summary = self._summary()
             self.leave_running(completed=True)
             self.panel.set_phase(self.finished_text())
             self._show_finished()
             self.on_finished()
+            self.footnote.configure(text=summary)
             self._announce()
         elif event.type is EventType.CANCELLED:
             self.leave_running(completed=False)
@@ -265,6 +268,30 @@ class TransferScreen(View):
                 message = f"{message}\n{event.detail}"
             self.panel.set_phase(message, error=True)
             self._announce()
+
+    def _summary(self) -> str:
+        """What just happened, in one line, from figures we really have.
+
+        "Sent" alone says nothing about how much moved or how long it
+        took. Every part here is omitted when it was never reported -
+        the receiving side learns no item count, for instance - rather
+        than filled in with a guess or a dash.
+        """
+        elapsed = 0 if self._started_at is None else time.monotonic() - self._started_at
+        clock = f"{int(elapsed) // 60}:{int(elapsed) % 60:02d}"
+
+        parts = []
+        items = self.panel.stat("items")
+        # One file is already named above as the phase; "1 files" adds
+        # nothing but an error of grammar.
+        if items and items != "1":
+            parts.append(self.t("done.files", count=items))
+        if size := self.panel.stat("size"):
+            parts.append(size)
+
+        if not parts:
+            return self.t("done.took", time=clock)
+        return self.t("done.summary", what=", ".join(parts), time=clock)
 
     def _announce(self) -> None:
         """Say the transfer is over, for someone who looked away.

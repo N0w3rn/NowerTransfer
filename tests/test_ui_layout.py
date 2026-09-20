@@ -336,6 +336,12 @@ def test_the_focused_card_looks_focused(ui):
     from nowertransfer.ui.theme import COLORS
 
     view = ui.open("home")
+    # Tk only delivers FocusIn while the toplevel is the active
+    # window, which is exactly the case a user is ever in - and
+    # without forcing it the test depends on whatever else happens to
+    # hold the desktop's focus.
+    ui.window.focus_force()
+    settle(ui.window)
     first, second = view._focus_stops
 
     first.focus_set()
@@ -552,6 +558,41 @@ def test_the_bundled_faces_are_the_ones_actually_drawn(ui, spec):
     assert drawn.actual("family").lower() == family.lower(), (
         f"asked for {family!r}, Tk drew {drawn.actual('family')!r}"
     )
+
+
+@pytest.mark.parametrize(
+    ("size", "items", "expected"),
+    [
+        # Both known: the send screen measures them before starting.
+        ("2.4 GB", "3", "3 files, 2.4 GB in "),
+        # One file is named above already; "1 files" is just wrong.
+        ("12 MB", "1", "12 MB in "),
+        # The receiving side never learns an item count.
+        ("85.8 MB", None, "85.8 MB in "),
+        # Nothing reported at all, which a quick transfer manages.
+        (None, None, "Done in "),
+    ],
+)
+def test_the_closing_line_uses_only_figures_it_has(ui, size, items, expected):
+    from nowertransfer.transfer import EventType, TransferEvent
+
+    # The window is shared across this file, so a selection left by an
+    # earlier test would measure itself into the figures.
+    ui.window.send_paths = []
+    view = ui.open("send", language="en")
+    view.enter_running()
+    if size is not None:
+        view.panel.set_stat("size", size)
+    if items is not None:
+        view.panel.set_stat("items", items)
+    settle(ui.window)
+
+    view.on_transfer_event(TransferEvent(EventType.FINISHED))
+    settle(ui.window)
+
+    line = view.footnote.cget("text")
+    assert line.startswith(expected), line
+    assert "—" not in line, "a placeholder reached the sentence"
 
 
 def test_the_panel_shows_crocs_speed_and_time_left(ui):

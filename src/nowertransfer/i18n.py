@@ -169,6 +169,12 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     "relay.unreachable": {"en": "Relay not reachable", "de": "Relay nicht erreichbar"},
     "relay.test": {"en": "Test connection", "de": "Verbindung testen"},
+    #: The line under the button once a transfer is over. Each part
+    #: is left out when nothing reported it, so the wording has to
+    #: work with only some of them present.
+    "done.summary": {"en": "{what} in {time}", "de": "{what} in {time}"},
+    "done.took": {"en": "Done in {time}", "de": "Fertig in {time}"},
+    "done.files": {"en": "{count} files", "de": "{count} Dateien"},
     "update.available": {
         "en": "Version {version} is out",
         "de": "Version {version} ist da",

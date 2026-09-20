@@ -231,6 +231,25 @@ class HomeView(View):
             side="right", padx=8
         )
 
+    def show_relay_state(self) -> None:
+        """Colour the dot for what the relay is currently known to do.
+
+        The dot used to be gold whatever the relay was doing, which
+        reads as "all well" even when nothing is listening. Grey while
+        the check runs or when there is no relay of ours to check,
+        gold when it answered, red when it did not.
+
+        Changed in place rather than by redrawing the screen: a
+        rebuild throws away the widgets, and with them the keyboard
+        focus the user may be holding.
+        """
+        label, colour = {
+            None: (self.t("relay.label"), COLORS.faint),
+            True: (self.t("relay.label"), COLORS.gold),
+            False: (self.t("relay.unreachable"), COLORS.error),
+        }[self.window.relay_reachable]
+        self._relay_dot.set(label, colour)
+
     def _blocker(self, title: str, body: str, accent: str) -> None:
         card = Card(self, accent=accent)
         card.pack(fill="x", pady=(24, 0))
@@ -249,16 +268,9 @@ class HomeView(View):
             if settings.mode is RelayMode.PUBLIC
             else settings.relay.display_host()
         )
-        # The dot used to be gold whatever the relay was doing, which
-        # read as "all well" even when nothing was listening. Grey
-        # while the check runs or when there is no relay of ours to
-        # check, gold when it answered, red when it did not.
-        label, colour = {
-            None: (self.t("relay.label"), COLORS.faint),
-            True: (self.t("relay.label"), COLORS.gold),
-            False: (self.t("relay.unreachable"), COLORS.error),
-        }[self.window.relay_reachable]
-        StatusDot(strip, label, colour).pack(side="left", padx=(16, 0), pady=11)
+        self._relay_dot = StatusDot(strip, "", COLORS.faint)
+        self._relay_dot.pack(side="left", padx=(16, 0), pady=11)
+        self.show_relay_state()
         ctk.CTkLabel(strip, text=relay, font=mono(12), text_color=COLORS.text).pack(
             side="left", padx=(10, 0)
         )
