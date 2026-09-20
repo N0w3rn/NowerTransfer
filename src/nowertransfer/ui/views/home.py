@@ -32,8 +32,12 @@ class HomeView(View):
         else:
             self._role_cards()
             self._resume_link()
-            self._update_notice()
 
+        # Outside the branches on purpose. A newer version is worth
+        # knowing about whether or not this copy can currently
+        # transfer anything - when croc is missing or the relay is
+        # unset, an update is if anything the likelier fix.
+        self._update_notice()
         self._footer()
 
     # ------------------------------------------------------------------

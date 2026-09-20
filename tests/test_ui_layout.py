@@ -215,12 +215,24 @@ def test_a_selection_from_the_command_line_opens_the_send_screen(ui, tmp_path):
     assert isinstance(ui.window._view, HomeView)
 
 
-def test_a_newer_release_is_announced_on_the_start_screen(ui):
+@pytest.mark.parametrize("croc_missing", [False, True])
+@pytest.mark.parametrize("configured", [True, False])
+def test_a_newer_release_is_announced_on_the_start_screen(
+    ui, monkeypatch, croc_missing, configured
+):
+    # Every state the start screen has, because the notice does not
+    # depend on any of them: an update is worth knowing about whether
+    # or not this copy can transfer anything today. The first version
+    # of this sat in the "all is well" branch and passed here only
+    # because a croc binary happens to exist in a checkout - CI has
+    # none, took the blocker branch, and went red.
     from nowertransfer.updates import Release
 
+    if croc_missing:
+        monkeypatch.setattr(ui.window, "croc_path", None)
     ui.window.newer_release = Release("9.9.9", "https://example.com/r")
     try:
-        view = ui.open("home")
+        view = ui.open("home", configured=configured)
         shown = [
             child for child in view.winfo_children() if "9.9.9" in _all_text(child)
         ]
