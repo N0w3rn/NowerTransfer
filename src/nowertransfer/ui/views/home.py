@@ -216,8 +216,11 @@ class HomeView(View):
             code = receiving.code
             reopen = partial(self.window.show_receive, resume=receiving)
 
-        strip = ctk.CTkFrame(self, fg_color=COLORS.panel, corner_radius=RADIUS)
-        strip.pack(fill="x", pady=(GAP, 0))
+        card = ctk.CTkFrame(self, fg_color=COLORS.panel, corner_radius=RADIUS)
+        card.pack(fill="x", pady=(GAP, 0))
+
+        strip = ctk.CTkFrame(card, fg_color="transparent")
+        strip.pack(fill="x")
         ctk.CTkLabel(
             strip,
             text=self.t("home.resume_short"),
@@ -230,6 +233,18 @@ class HomeView(View):
         link_button(strip, self.t("home.resume_open"), reopen, width=90).pack(
             side="right", padx=8
         )
+
+        if receiving is not None:
+            # croc pre-allocates the destination at its full size, so
+            # a half-received file is the same number of bytes as a
+            # whole one and looks finished in Explorer. Nothing on
+            # disk can say otherwise - renaming it would stop croc
+            # resuming - so it has to be said here.
+            hint(
+                card,
+                self.t("home.resume_incomplete", folder=receiving.target),
+                width=600,
+            ).pack(anchor="w", fill="x", padx=16, pady=(0, 11))
 
     def show_relay_state(self) -> None:
         """Colour the dot for what the relay is currently known to do.

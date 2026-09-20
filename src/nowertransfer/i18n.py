@@ -199,6 +199,19 @@ CATALOG: dict[str, dict[str, str]] = {
         ),
     },
     "home.resume_short": {"en": "Resume", "de": "Fortsetzen"},
+    #: croc writes the destination at its full size from the start, so
+    #: an unfinished file is the same number of bytes as a finished
+    #: one. Nothing on disk shows that; only this line does.
+    "home.resume_incomplete": {
+        "en": (
+            "The file in {folder} is already its full size but is not "
+            "complete. Resume to finish it."
+        ),
+        "de": (
+            "Die Datei in {folder} hat schon ihre volle Größe, ist aber "
+            "unvollständig. Zum Fertigstellen fortsetzen."
+        ),
+    },
     "home.resume_open": {"en": "Open", "de": "Öffnen"},
     "send.step": {"en": "Step 1 of 2", "de": "Schritt 1 von 2"},
     "send.drop_here": {

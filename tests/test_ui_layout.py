@@ -383,6 +383,51 @@ def test_the_receive_field_only_takes_a_certain_code(ui, clipboard, filled):
         assert got == clipboard.strip().lower()
 
 
+def test_a_resumable_receive_warns_that_the_file_is_not_finished(ui, tmp_path):
+    # croc pre-allocates the destination at full size - measured, a
+    # cancelled 60 MB receive leaves 60,000,000 bytes on disk - so an
+    # unfinished file is indistinguishable from a whole one in
+    # Explorer. Only this line says otherwise.
+    from nowertransfer import session
+    from nowertransfer.ui.views import home as home_view
+
+    target = tmp_path / "downloads"
+    target.mkdir()
+    stored = session.ReceiveSession("falke-wolke-tiger-nebel-quarz-83", str(target))
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(home_view, "load_send_session", lambda: None)
+    monkey.setattr(home_view, "load_receive_session", lambda: stored)
+    try:
+        view = ui.open("home", language="en")
+        shown = _all_text(view)
+        assert stored.code in shown
+        assert "not" in shown and "complete" in shown, shown
+        assert str(target) in shown
+        assert not ui.collapsed(view)
+    finally:
+        monkey.undo()
+
+
+def test_a_resumable_send_says_nothing_about_an_unfinished_file(ui, tmp_path):
+    # The warning is about the receiving side's pre-allocated file;
+    # the sender's own files are untouched.
+    from nowertransfer import session
+    from nowertransfer.ui.views import home as home_view
+
+    payload = tmp_path / "holiday.zip"
+    payload.write_text("x", encoding="utf-8")
+    stored = session.SendSession("falke-wolke-tiger-nebel-quarz-83", [str(payload)])
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(home_view, "load_send_session", lambda: stored)
+    try:
+        view = ui.open("home", language="en")
+        shown = _all_text(view)
+        assert stored.code in shown
+        assert "complete" not in shown, shown
+    finally:
+        monkey.undo()
+
+
 def test_the_role_cards_sit_under_the_header(ui):
     # They used to float in the middle of the window, because their
     # row took the spare height. The header, the cards and the resume
