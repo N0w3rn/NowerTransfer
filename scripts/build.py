@@ -132,8 +132,68 @@ def ensure_croc(tag: str | None, skip: bool) -> Path:
     return binary
 
 
+PUBLISHER = "Nowenr"
+
+#: Windows file metadata. Without it the .exe has no publisher, no
+#: product name and no version in its properties, which is both worse
+#: to look at and one more reason for a virus scanner's heuristics to
+#: distrust an unsigned binary that unpacks itself.
+VERSION_RESOURCE = """\
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers={numbers},
+    prodvers={numbers},
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0),
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable('040904B0', [
+        StringStruct('CompanyName', '{publisher}'),
+        StringStruct('FileDescription', '{name} - send files through your own relay'),
+        StringStruct('FileVersion', '{version}'),
+        StringStruct('InternalName', '{name}'),
+        StringStruct('LegalCopyright', 'MIT licence. croc by schollz, also MIT.'),
+        StringStruct('OriginalFilename', '{name}.exe'),
+        StringStruct('ProductName', '{name}'),
+        StringStruct('ProductVersion', '{version}'),
+      ]),
+    ]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])]),
+  ],
+)
+"""
+
+
+def numeric_version(version: str) -> tuple[int, int, int, int]:
+    """Four numbers, which is all the Windows metadata field accepts.
+
+    ``1.2.3-rc1`` becomes ``(1, 2, 3, 0)``; the label survives in the
+    version strings beside it, which is what anyone actually reads.
+    """
+    numbers = [int(part) for part in re.findall(r"\d+", version.split("-")[0])[:4]]
+    numbers += [0] * (4 - len(numbers))
+    return tuple(numbers)  # type: ignore[return-value]
+
+
+def version_resource(version: str) -> str:
+    return VERSION_RESOURCE.format(
+        numbers=numeric_version(version),
+        version=version,
+        name=APP_NAME,
+        publisher=PUBLISHER,
+    )
+
+
 def pyinstaller_command(
-    croc: Path, relay_file: Path | None, version_file: Path | None = None
+    croc: Path,
+    relay_file: Path | None,
+    version_file: Path | None = None,
+    resource_file: Path | None = None,
 ) -> list[str]:
     separator = os.pathsep
     command = [
@@ -167,6 +227,8 @@ def pyinstaller_command(
         command += ["--add-data", f"{relay_file}{separator}."]
     if version_file is not None:
         command += ["--add-data", f"{version_file}{separator}."]
+    if resource_file is not None:
+        command += ["--version-file", str(resource_file)]
     if ICON_PATH.exists():
         # --icon sets the .exe's own icon; the running window loads the
         # bundled copy itself, so it has to be packed in as well.
@@ -246,7 +308,15 @@ def main(argv: list[str] | None = None) -> int:
         version_file.write_text(version, encoding="utf-8")
         print(f"version: {version}")
 
-        command = pyinstaller_command(croc, relay_file, version_file)
+        # Only on Windows: nothing else has a version resource, and
+        # PyInstaller rejects --version-file there.
+        resource_file: Path | None = None
+        if os.name == "nt":
+            resource_file = Path(staging) / "version_info.txt"
+            resource_file.write_text(version_resource(version), encoding="utf-8")
+            print(f"file metadata: {PUBLISHER}, {numeric_version(version)}")
+
+        command = pyinstaller_command(croc, relay_file, version_file, resource_file)
         print("running:", " ".join(command))
         result = subprocess.run(command, cwd=PROJECT_ROOT, check=False)
 

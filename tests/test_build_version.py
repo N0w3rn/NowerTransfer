@@ -67,3 +67,65 @@ def test_a_branch_name_is_not_a_version(monkeypatch):
 def test_an_explicit_version_beats_the_tag(monkeypatch):
     monkeypatch.setenv("GITHUB_REF_NAME", "v1.2.3")
     assert build.resolve_app_version("9.9.9") == "9.9.9"
+
+
+# ----------------------------------------------------------------------
+#  The Windows version resource
+# ----------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("version", "expected"),
+    [
+        ("1.0.0", (1, 0, 0, 0)),
+        ("12.34.56", (12, 34, 56, 0)),
+        # The field takes numbers only, so a label cannot go in it.
+        ("1.0.0-rc1", (1, 0, 0, 0)),
+        ("2.1.0-test", (2, 1, 0, 0)),
+    ],
+)
+def test_numeric_version(version, expected):
+    assert build.numeric_version(version) == expected
+
+
+def test_the_resource_carries_publisher_and_version():
+    # An .exe with empty properties looks like nothing in Explorer and
+    # gives a scanner's heuristics one more reason to distrust an
+    # unsigned binary that unpacks itself.
+    resource = build.version_resource("1.0.0-rc1")
+
+    assert "StringStruct('CompanyName', 'Nowenr')" in resource
+    assert "StringStruct('ProductName', 'NowerTransfer')" in resource
+    assert "StringStruct('FileVersion', '1.0.0-rc1')" in resource
+    assert "filevers=(1, 0, 0, 0)" in resource
+    assert "OriginalFilename', 'NowerTransfer.exe'" in resource
+
+
+def test_the_resource_is_valid_python_for_pyinstaller():
+    # PyInstaller evaluates this file, so a typo is a build failure.
+    from PyInstaller.utils.win32.versioninfo import (  # noqa: F401
+        FixedFileInfo,
+        StringFileInfo,
+        StringStruct,
+        StringTable,
+        VarFileInfo,
+        VarStruct,
+        VSVersionInfo,
+    )
+
+    # eval is how PyInstaller itself reads the file, so it is also the
+    # only faithful way to check that what we generate parses.
+    parsed = eval(build.version_resource("3.2.1"), locals())
+    assert isinstance(parsed, VSVersionInfo)
+
+
+def test_the_resource_is_passed_to_pyinstaller(tmp_path):
+    resource = tmp_path / "version_info.txt"
+    command = build.pyinstaller_command(
+        tmp_path / "croc.exe", None, None, resource_file=resource
+    )
+    assert "--version-file" in command
+    assert str(resource) in command
+
+
+def test_no_resource_means_no_flag(tmp_path):
+    command = build.pyinstaller_command(tmp_path / "croc.exe", None, None, None)
+    assert "--version-file" not in command
