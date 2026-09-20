@@ -16,7 +16,15 @@ import customtkinter as ctk
 from ...config import RelayMode, save_settings, with_relay
 from ...relaycheck import RelayCheck, RelayStatus, check
 from ..theme import COLORS, GAP, GOLD_ACCENT, NEUTRAL_ACCENT, RADIUS, font, mono
-from ..widgets import StatusDot, caption, entry, hint, outline_button, primary_button
+from ..widgets import (
+    Segmented,
+    StatusDot,
+    caption,
+    entry,
+    hint,
+    outline_button,
+    primary_button,
+)
 from .base import View
 
 _CHECK_POLL_MS = 120
@@ -70,20 +78,10 @@ class SettingsView(View):
         self._mode_labels = {
             mode: self.t(f"settings.relay_mode.{mode.value}") for mode in RelayMode
         }
-        self._mode = ctk.CTkSegmentedButton(
+        self._mode = Segmented(
             self,
-            values=list(self._mode_labels.values()),
-            height=36,
-            corner_radius=10,
-            font=font(12),
-            fg_color=COLORS.well,
-            selected_color=COLORS.gold,
-            selected_hover_color=COLORS.gold_hover,
-            unselected_color=COLORS.well,
-            unselected_hover_color=COLORS.panel_hover,
-            text_color=COLORS.text,
-            text_color_disabled=COLORS.faint,
-            command=self._sync_relay_fields,
+            list(self._mode_labels.values()),
+            self._sync_relay_fields,
         )
         current = RelayMode.parse(
             self._draft("draft_mode", self.window.settings.relay_mode)

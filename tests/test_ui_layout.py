@@ -468,6 +468,25 @@ def test_the_connection_test_does_not_claim_the_password_is_right(ui, monkeypatc
     assert "password not checked" in said, said
 
 
+@pytest.mark.parametrize("mode", list(RelayMode))
+def test_the_chosen_relay_mode_is_readable(ui, mode):
+    # The chosen segment is gold. CTkSegmentedButton paints every
+    # segment's label the same colour, so the choice was near-white on
+    # gold - there, but not readable.
+    from nowertransfer.ui.theme import COLORS
+
+    view = ui.open("settings")
+    select(view, mode)
+    settle(ui.window)
+
+    for label, button in view._mode._buttons_dict.items():
+        chosen = label == view._mode_labels[mode]
+        expected = COLORS.ink if chosen else COLORS.text
+        assert button.cget("text_color") == expected, (
+            f"{label!r} (chosen={chosen}) is {button.cget('text_color')}"
+        )
+
+
 def test_locking_the_relay_fields_keeps_what_was_typed(ui):
     view = ui.open("settings")
     view._host_entry.delete(0, "end")

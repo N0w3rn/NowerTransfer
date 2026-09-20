@@ -199,6 +199,51 @@ class IconButton(ctk.CTkFrame):
         self._icon.recolour(COLORS.text if active else COLORS.muted, background)
 
 
+class Segmented(ctk.CTkSegmentedButton):
+    """A row of options where the chosen one is readable.
+
+    CTkSegmentedButton has a single text colour for every segment. The
+    chosen segment is gold here, and the app's text colour is nearly
+    white, so the label on it could not be read. Repainting happens in
+    the select hooks rather than in a command, because those are what
+    both a click and a programmatic ``set`` go through.
+    """
+
+    def __init__(
+        self,
+        master: ctk.CTkBaseClass,
+        values: list[str],
+        command: Callable[[str], None] | None = None,
+        *,
+        height: int = 36,
+    ) -> None:
+        super().__init__(
+            master,
+            values=values,
+            command=command,
+            height=height,
+            corner_radius=10,
+            font=font(12),
+            fg_color=COLORS.well,
+            selected_color=COLORS.gold,
+            selected_hover_color=COLORS.gold_hover,
+            unselected_color=COLORS.well,
+            unselected_hover_color=COLORS.panel_hover,
+            text_color=COLORS.text,
+            text_color_disabled=COLORS.faint,
+        )
+
+    def _select_button_by_value(self, value: str) -> None:
+        super()._select_button_by_value(value)
+        if value in self._buttons_dict:
+            self._buttons_dict[value].configure(text_color=COLORS.ink)
+
+    def _unselect_button_by_value(self, value: str) -> None:
+        super()._unselect_button_by_value(value)
+        if value in self._buttons_dict:
+            self._buttons_dict[value].configure(text_color=COLORS.text)
+
+
 def badge(
     master: ctk.CTkBaseClass,
     name: str,
