@@ -226,6 +226,36 @@ def test_the_code_on_screen_is_the_one_that_will_be_sent(ui):
 
 
 # ----------------------------------------------------------------------
+#  Brand fonts
+# ----------------------------------------------------------------------
+@pytest.mark.skipif(
+    sys.platform != "win32", reason="the fonts are registered through GDI"
+)
+@pytest.mark.parametrize("spec", ["display", "mono", "mono-bold"])
+def test_the_bundled_faces_are_the_ones_actually_drawn(ui, spec):
+    # Registering a font and selecting it are two different things: ask
+    # for a family no file carries and Tk substitutes one without a
+    # word. Only Font.actual tells you which face you really got.
+    from tkinter import font as tkfont
+
+    from nowertransfer.ui.theme import display, mono
+
+    wanted = {
+        "display": display(19),
+        "mono": mono(12),
+        "mono-bold": mono(19, bold=True),
+    }
+    family, size, *rest = wanted[spec]
+    drawn = tkfont.Font(
+        root=ui.window, family=family, size=size, weight=rest[0] if rest else "normal"
+    )
+
+    assert drawn.actual("family").lower() == family.lower(), (
+        f"asked for {family!r}, Tk drew {drawn.actual('family')!r}"
+    )
+
+
+# ----------------------------------------------------------------------
 #  Dropped files
 # ----------------------------------------------------------------------
 def test_a_tcl_file_list_splits_into_paths(ui):

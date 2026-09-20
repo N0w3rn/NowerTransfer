@@ -16,10 +16,14 @@ from ..paths import bundle_dir, project_root
 
 FONT_DIRNAME = "fonts"
 
-#: Family name -> the file that provides it.
+#: Family name -> every weight that ships for it. The family has to be
+#: the one written in the file: Windows enumerates fonts by that name,
+#: so asking for a name the file does not carry finds nothing. Only the
+#: weights actually used are here - display text is always bold, the
+#: monospace face is used both ways.
 BUNDLED = {
-    "Space Grotesk": "SpaceGrotesk-Bold.ttf",
-    "IBM Plex Mono": "IBMPlexMono-Medium.ttf",
+    "Space Grotesk": ("SpaceGrotesk-Bold.ttf",),
+    "IBM Plex Mono": ("IBMPlexMono-Regular.ttf", "IBMPlexMono-Bold.ttf"),
 }
 
 _FR_PRIVATE = 0x10
@@ -43,14 +47,19 @@ def _register() -> set[str]:
 
     available: set[str] = set()
     directory = font_dir()
-    for family, filename in BUNDLED.items():
-        path = directory / filename
-        if not path.is_file():
-            continue
-        with suppress(OSError, AttributeError):
-            added = ctypes.windll.gdi32.AddFontResourceExW(str(path), _FR_PRIVATE, 0)
-            if added:
-                available.add(family)
+    for family, filenames in BUNDLED.items():
+        loaded = 0
+        for filename in filenames:
+            path = directory / filename
+            if not path.is_file():
+                continue
+            with suppress(OSError, AttributeError):
+                if ctypes.windll.gdi32.AddFontResourceExW(str(path), _FR_PRIVATE, 0):
+                    loaded += 1
+        # All or nothing: half a family means one weight silently
+        # rendered in something else.
+        if loaded == len(filenames):
+            available.add(family)
     return available
 
 

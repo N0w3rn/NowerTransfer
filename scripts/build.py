@@ -178,6 +178,12 @@ def pyinstaller_command(
         asset = ASSETS_DIR / name
         if asset.exists():
             command += ["--add-data", f"{asset}{separator}."]
+
+    # The brand faces, into the subdirectory ui/fonts.py looks in. The
+    # licences travel with them: the OFL requires it.
+    fonts = ASSETS_DIR / "fonts"
+    if fonts.is_dir():
+        command += ["--add-data", f"{fonts}{separator}fonts"]
     command.append(str(PROJECT_ROOT / "scripts" / "entrypoint.py"))
     return command
 

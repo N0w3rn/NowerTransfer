@@ -9,6 +9,10 @@ anywhere, and does not configure anything. They double-click the `.exe`,
 pick *Send* or *Receive*, and the file moves — end-to-end encrypted, over
 infrastructure you control.
 
+Sending is a drag of the files onto the window, or a click if you prefer;
+receiving is the code phrase and nothing else. The interface is German or
+English, switchable in the header.
+
 Under the hood it drives [croc](https://github.com/schollz/croc), which
 handles the encryption, the NAT traversal and the relay protocol.
 
@@ -72,7 +76,11 @@ At runtime the app resolves each value through four layers, later wins:
 | user | in-app settings screen | the recipient changing it themselves |
 | environment | `NOWERTRANSFER_RELAY`, `NOWERTRANSFER_RELAY_PASSWORD` | CI and scripted runs |
 
-The settings screen shows which layer each value came from. The last three
+The settings screen shows which layer each value came from, and has a
+**Test connection** button: it reports whether the relay answers and how
+long that took, and names a refused relay password when croc refuses
+one. It will not claim a password is correct — croc only reports a
+refusal reliably once, so silence is not proof. The last three layers
 live on the user's machine and never appear in this repository.
 
 ### Which relay
@@ -198,19 +206,31 @@ src/nowertransfer/
   croc.py       locating the croc binary
   transfer.py   subprocess handling, retries, output parsing
   i18n.py       German / English catalogue
-  ui/           theme, widgets, one module per screen
+  relaycheck.py the settings screen's connection test
+  ui/           theme, fonts, widgets, drag and drop, one module per screen
 scripts/
   build.py         builds the executable, bakes in the relay
   make_installer.py wraps it in an Inno Setup installer
   fetch_croc.py    downloads croc from its GitHub releases
 installer/
   NowerTransfer.iss the setup script
+assets/
+  fonts/        the two bundled faces, with their licences
 ```
 
-No secrets are committed, and no third-party binaries: `croc` is fetched
-at build time, pinned to one release in `scripts/fetch_croc.py` and
-verified against the SHA-256 that release publishes. (`assets/` holds the
-app's own icon, which is source, not a dependency.)
+No secrets are committed, and `croc` is not: it is fetched at build time,
+pinned to one release in `scripts/fetch_croc.py` and verified against the
+SHA-256 that release publishes.
+
+`assets/` holds the logo and icon, which are the app's own, and
+`assets/fonts/` the two faces it draws with — [Space
+Grotesk](https://github.com/floriankarsten/space-grotesk) and [IBM Plex
+Mono](https://github.com/IBM/plex), both under the SIL Open Font License
+1.1, whose text ships beside them. They are committed rather than
+fetched because they are small, versionless in practice, and the app
+should not need the network to look right. Windows loads them for the
+running process only, so nothing is installed on the user's machine; if
+that fails the app falls back to Segoe UI and Consolas.
 
 **Both sides of a transfer need the same croc major version.** croc 11
 changed its PAKE handshake and refuses croc 10 peers outright, so when the
@@ -224,4 +244,6 @@ that relay. Build locally to hand out a preconfigured copy.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). The bundled fonts are not MIT: both are
+SIL Open Font License 1.1, with their texts in `assets/fonts/`. croc,
+fetched at build time, is MIT.
