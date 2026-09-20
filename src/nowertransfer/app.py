@@ -9,6 +9,9 @@ from . import APP_NAME, __version__
 from .config import load_settings
 from .i18n import detect_language
 
+#: Vendor.Product, the form Windows expects for a taskbar identity.
+APP_ID = f"Nowenr.{APP_NAME}"
+
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -34,6 +37,12 @@ def main(argv: list[str] | None = None) -> int:
 
     # Imported late so --version works even without a display attached.
     from .ui.main_window import MainWindow
+    from .ui.winicon import set_app_id
+
+    # Before the window exists: Windows reads it when the taskbar
+    # button is created. Otherwise a one-file build is identified by
+    # its temporary host process, not by us.
+    set_app_id(APP_ID)
 
     MainWindow(settings).mainloop()
     return 0

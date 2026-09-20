@@ -23,6 +23,7 @@ from ..i18n import Translator
 from ..paths import icon_path
 from ..session import SendSession
 from ..transfer import EventType, TransferEvent, TransferWorker
+from . import winicon
 from .theme import COLORS, PAD_WINDOW
 from .views import HomeView, ReceiveView, SendView, SettingsView
 from .views.base import View
@@ -72,15 +73,23 @@ class MainWindow(ctk.CTk):
     def _apply_icon(self) -> None:
         """Put the logo in the title bar and the taskbar.
 
-        PyInstaller's --icon only covers the .exe file itself; the running
-        window needs this. Purely cosmetic, so a platform that cannot do
-        it (tkinter wants .xbm outside Windows) is not worth an error.
+        PyInstaller's --icon only covers the .exe file itself; the
+        running window needs this. Purely cosmetic, so a platform that
+        cannot do it (tkinter wants .xbm outside Windows) is not worth
+        an error.
         """
         icon = icon_path()
         if icon is None:
             return
+        # iconbitmap first, and not only as the fallback: 200ms after
+        # start CustomTkinter installs *its* icon unless this method
+        # has been called. It checks nothing but that, so calling it
+        # claims the slot as well as setting a usable icon.
         with suppress(tk.TclError):
             self.iconbitmap(str(icon))
+        # Then the real thing: one image per size, which iconbitmap
+        # does not do - see ui/winicon.py.
+        winicon.apply_icon(self, icon)
 
     # ------------------------------------------------------------------
     #  Navigation

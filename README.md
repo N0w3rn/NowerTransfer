@@ -237,7 +237,10 @@ coordinates, so they stay sharp at any display scaling and take the
 colour of whatever they sit on. `scripts/make_icon.py` renders
 `assets/icon.ico` from the logo at every size Windows asks for, each
 one drawn from the full-size original rather than scaled down from the
-next size up, which is what makes a taskbar icon look smeared.
+next size up, which is what makes a taskbar icon look smeared. Drop an
+`assets/logo-small.png` beside the logo and the sizes at 32 pixels and
+below are drawn from that instead: the Windows 11 taskbar renders at
+24 pixels, which is less room than the full mark needs.
 
 `assets/` holds the logo and icon, which are the app's own, and
 `assets/fonts/` the two faces it draws with — [Space

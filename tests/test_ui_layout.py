@@ -255,6 +255,77 @@ def test_the_code_on_screen_is_the_one_that_will_be_sent(ui):
 
 
 # ----------------------------------------------------------------------
+#  The window icon
+# ----------------------------------------------------------------------
+@pytest.mark.skipif(sys.platform != "win32", reason="Win32 icon slots")
+def test_the_window_keeps_our_icon_at_both_sizes(ui):
+    # Two ways this broke. Tk's iconbitmap installs one image for every
+    # slot, so the 16-pixel slot got a 32-pixel image squeezed into it.
+    # And CustomTkinter installs *its* icon 200ms after start unless
+    # iconbitmap has been called - which the Win32 fix alone did not
+    # do, so the taskbar showed CustomTkinter's blue square instead.
+    import ctypes
+    from ctypes import c_uint, c_void_p, wintypes
+
+    user32 = ctypes.windll.user32
+    user32.SendMessageW.restype = c_void_p
+    user32.SendMessageW.argtypes = [c_void_p, c_uint, c_void_p, c_void_p]
+    user32.GetAncestor.restype = c_void_p
+    user32.GetAncestor.argtypes = [c_void_p, c_uint]
+
+    class ICONINFO(ctypes.Structure):
+        _fields_ = [
+            ("fIcon", wintypes.BOOL),
+            ("xHotspot", wintypes.DWORD),
+            ("yHotspot", wintypes.DWORD),
+            ("hbmMask", c_void_p),
+            ("hbmColor", c_void_p),
+        ]
+
+    class BITMAP(ctypes.Structure):
+        _fields_ = [
+            ("bmType", wintypes.LONG),
+            ("bmWidth", wintypes.LONG),
+            ("bmHeight", wintypes.LONG),
+            ("bmWidthBytes", wintypes.LONG),
+            ("bmPlanes", wintypes.WORD),
+            ("bmBitsPixel", wintypes.WORD),
+            ("bmBits", c_void_p),
+        ]
+
+    user32.GetIconInfo.argtypes = [c_void_p, ctypes.POINTER(ICONINFO)]
+    ctypes.windll.gdi32.GetObjectW.argtypes = [c_void_p, ctypes.c_int, c_void_p]
+
+    def width_of(handle):
+        info = ICONINFO()
+        assert handle, "no icon installed at all"
+        assert user32.GetIconInfo(handle, ctypes.byref(info))
+        bitmap = BITMAP()
+        ctypes.windll.gdi32.GetObjectW(
+            info.hbmColor, ctypes.sizeof(BITMAP), ctypes.byref(bitmap)
+        )
+        for handle_ in (info.hbmColor, info.hbmMask):
+            if handle_:
+                ctypes.windll.gdi32.DeleteObject(c_void_p(handle_))
+        return bitmap.bmWidth
+
+    # Past CustomTkinter's 200ms timer, so this is the settled state.
+    ui.window.after(260, ui.window.quit)
+    ui.window.mainloop()
+
+    hwnd = user32.GetAncestor(c_void_p(ui.window.winfo_id()), 2)
+    wanted = {
+        "small": (0, user32.GetSystemMetrics(49)),
+        "big": (1, user32.GetSystemMetrics(11)),
+    }
+    for label, (which, expected) in wanted.items():
+        handle = user32.SendMessageW(c_void_p(hwnd), 0x007F, c_void_p(which), None)
+        assert width_of(handle) == expected, (
+            f"{label} icon is {width_of(handle)}px, Windows asked for {expected}px"
+        )
+
+
+# ----------------------------------------------------------------------
 #  Brand fonts
 # ----------------------------------------------------------------------
 @pytest.mark.skipif(
