@@ -32,10 +32,13 @@ def session_path() -> Path:
 
 
 def save_send_session(code: str, paths: list[str]) -> None:
+    # The paths are encrypted too, not only the code phrase: a folder
+    # name says what was being sent, and that is worth as little to a
+    # reader of this file as the phrase itself.
     payload = {
         "mode": "send",
         "code": protect(code),
-        "paths": [str(p) for p in paths],
+        "paths": [protect(str(p)) for p in paths],
     }
     # Failing to record a resume point must not break the transfer.
     with suppress(OSError):
@@ -63,7 +66,15 @@ def load_send_session() -> SendSession | None:
     # A code that will not decrypt came from another machine; nothing
     # to resume.
     code = unprotect(stored_code)
-    existing = [p for p in paths if isinstance(p, str) and Path(p).exists()]
+    # unprotect passes an untagged value straight through, so a file
+    # written before the paths were encrypted still resumes.
+    existing = [
+        decrypted
+        for stored in paths
+        if isinstance(stored, str)
+        and (decrypted := unprotect(stored))
+        and Path(decrypted).exists()
+    ]
     if not code or not existing:
         return None
     return SendSession(code=code, paths=existing)

@@ -1,7 +1,8 @@
 """Encrypting the secrets this app keeps on disk.
 
-Two of them: the relay password from the settings screen, and the code
-phrase of an interrupted send.
+Three of them: the relay password from the settings screen, and the
+code phrase and file paths of an interrupted send. The paths are in
+here because a folder name says what was being sent.
 
 On Windows that is DPAPI, bound to the user account - another account
 cannot read it, and a copy that leaves the machine is useless. It does
@@ -9,8 +10,9 @@ cannot read it, and a copy that leaves the machine is useless. It does
 locally can, and pretending otherwise invites misplaced trust.
 
 Elsewhere no keystore is reachable without a dependency, so values are
-stored in the clear and the file is made owner-only instead. The stored
-form says which of the two it is.
+stored in the clear and the file is restricted to its owner instead
+(see :mod:`~nowertransfer.ownership`). The stored form says which of
+the two it is.
 
 Not stored here: the relay baked into a build. A binary must decrypt its
 own configuration unattended, so any key would travel with it - that one

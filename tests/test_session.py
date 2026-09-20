@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from nowertransfer import paths, secretstore, session
@@ -35,6 +37,44 @@ def test_the_code_phrase_is_not_stored_in_the_clear(tmp_path):
     session.save_send_session(CODE, [str(payload)])
 
     assert CODE not in session.session_path().read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(
+    not secretstore.is_encrypting(),
+    reason="no OS keystore on this platform; values are stored in the clear",
+)
+def test_the_paths_are_not_stored_in_the_clear(tmp_path):
+    # A folder name says what was being sent. It is worth as little to
+    # a reader of this file as the code phrase is.
+    payload = tmp_path / "quarterly numbers.txt"
+    payload.write_text("hi", encoding="utf-8")
+    session.save_send_session(CODE, [str(payload)])
+
+    stored = session.session_path().read_text(encoding="utf-8")
+    assert "quarterly numbers" not in stored
+    assert str(tmp_path) not in stored
+
+
+def test_a_session_written_before_the_paths_were_encrypted_still_resumes(tmp_path):
+    # Upgrading must not silently drop somebody's resume point.
+    payload = tmp_path / "payload.txt"
+    payload.write_text("hi", encoding="utf-8")
+    session.session_path().write_text(
+        json.dumps(
+            {
+                "mode": "send",
+                "code": secretstore.protect(CODE),
+                "paths": [payload.as_posix()],  # as an older version wrote it
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    restored = session.load_send_session()
+
+    assert restored is not None
+    assert restored.code == CODE
+    assert restored.paths == [payload.as_posix()]
 
 
 def test_a_session_from_another_machine_is_not_offered(tmp_path):

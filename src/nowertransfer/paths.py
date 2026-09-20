@@ -15,6 +15,7 @@ from contextlib import suppress
 from pathlib import Path
 
 from . import APP_NAME
+from .ownership import restrict_to_owner
 
 
 def is_frozen() -> bool:
@@ -122,18 +123,19 @@ def open_in_file_manager(path: Path) -> None:
 def write_atomic(path: Path, text: str, *, private: bool = False) -> None:
     """Write ``text`` to ``path`` without leaving a half-written file behind.
 
-    With ``private``, the file is restricted to its owner before anything
-    is written to it. That is the only at-rest protection available on
-    platforms without a keystore; on Windows the contents are encrypted
-    instead (see :mod:`~nowertransfer.secretstore`).
+    With ``private``, the directory and the file are restricted to the
+    current account before anything is written - see
+    :mod:`~nowertransfer.ownership`, which does the work Windows needs.
+    The contents of the secrets themselves are encrypted on top of that
+    (see :mod:`~nowertransfer.secretstore`).
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
     if private:
-        # Created restricted before anything is written to it; touch()
-        # only applies the mode when it creates the file, hence chmod.
-        temporary.touch(mode=0o600, exist_ok=True)
-        with suppress(OSError, NotImplementedError):
-            temporary.chmod(0o600)
+        # The directory first: a file inherits from it, and the
+        # temporary below is created inside it.
+        restrict_to_owner(path.parent)
+        temporary.touch(exist_ok=True)
+        restrict_to_owner(temporary)
     temporary.write_text(text, encoding="utf-8")
     temporary.replace(path)

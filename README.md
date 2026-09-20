@@ -195,9 +195,16 @@ source version is written — `pyproject.toml` reads that same line.
   simply has not shown up yet.
 - **Secrets on disk are encrypted to the Windows account** that wrote
   them, via DPAPI. That covers the relay password saved in the settings
-  screen and the code phrase of an interrupted send. A copy of those files
-  on another machine or account is useless; code already running as that
+  screen, and the code phrase *and file paths* of an interrupted send —
+  a folder name says what was being sent. A copy of those files on
+  another machine or account is useless; code already running as that
   user is not stopped by anything stored locally.
+- **The settings directory is restricted to that account.** `chmod` is
+  what does it on Linux and macOS; on Windows it does nothing to the
+  access control list, so the list is rewritten instead — inheritance
+  off, one entry, no Administrators and no SYSTEM. Without that a
+  second account on the same machine could read the file, and the
+  encryption above would be all that stood between them and it.
 - **The relay baked into a build is readable**, and cannot be otherwise —
   a binary has to decrypt its own configuration unattended, so the key
   would travel with it. Treat an `.exe` you hand out as disclosing its
