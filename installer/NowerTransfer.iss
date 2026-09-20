@@ -47,6 +47,13 @@ Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; \
     GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "contextmenu"; Description: "{cm:ContextMenuEntry}"
+
+[CustomMessages]
+english.ContextMenuEntry=Add "Send with NowerTransfer" to the right-click menu
+german.ContextMenuEntry="Mit NowerTransfer senden" ins Rechtsklick-Menü aufnehmen
+english.ContextMenuVerb=Send with NowerTransfer
+german.ContextMenuVerb=Mit NowerTransfer senden
 
 [Files]
 Source: "{#SourceExe}"; DestDir: "{app}"; DestName: "NowerTransfer.exe"; \
@@ -56,6 +63,34 @@ Source: "{#SourceExe}"; DestDir: "{app}"; DestName: "NowerTransfer.exe"; \
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\NowerTransfer.exe"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\NowerTransfer.exe"; \
     Tasks: desktopicon
+
+; "Send with NowerTransfer", for a file and for a folder. Under HKCU
+; because the install is per-user; uninstalldelete removes the keys
+; again. Explorer starts one copy per selected item, so selecting
+; several files opens several windows - that is how the shell works
+; for a plain verb, not something the app can merge.
+[Registry]
+Root: HKCU; Subkey: "Software\Classes\*\shell\{#AppName}"; \
+    ValueType: string; ValueName: ""; ValueData: "{cm:ContextMenuVerb}"; \
+    Flags: uninsdeletekey; Tasks: contextmenu
+Root: HKCU; Subkey: "Software\Classes\*\shell\{#AppName}"; \
+    ValueType: string; ValueName: "Icon"; \
+    ValueData: """{app}\NowerTransfer.exe"",0"; Tasks: contextmenu
+Root: HKCU; Subkey: "Software\Classes\*\shell\{#AppName}\command"; \
+    ValueType: string; ValueName: ""; \
+    ValueData: """{app}\NowerTransfer.exe"" ""%1"""; \
+    Flags: uninsdeletekey; Tasks: contextmenu
+
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\{#AppName}"; \
+    ValueType: string; ValueName: ""; ValueData: "{cm:ContextMenuVerb}"; \
+    Flags: uninsdeletekey; Tasks: contextmenu
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\{#AppName}"; \
+    ValueType: string; ValueName: "Icon"; \
+    ValueData: """{app}\NowerTransfer.exe"",0"; Tasks: contextmenu
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\{#AppName}\command"; \
+    ValueType: string; ValueName: ""; \
+    ValueData: """{app}\NowerTransfer.exe"" ""%1"""; \
+    Flags: uninsdeletekey; Tasks: contextmenu
 
 [Run]
 Filename: "{app}\NowerTransfer.exe"; \

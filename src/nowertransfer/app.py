@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from . import APP_NAME, __version__
 from .config import load_settings
@@ -22,6 +23,29 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--version", action="version", version=f"{APP_NAME} {__version__}"
     )
     return parser.parse_args(argv)
+
+
+def preselected(argv: list[str] | None = None) -> list[Path]:
+    """Files and folders handed to us on the command line.
+
+    This is how "Send with NowerTransfer" in the Explorer menu works:
+    Windows starts the app with the selected path as an argument.
+
+    Deliberately not argparse. A windowed build has no stdout, so
+    argparse cannot run at all there - and that build is precisely the
+    one Explorer starts. Anything that is not a flag and does exist is
+    taken as a selection; anything else is ignored rather than
+    reported, because there is nowhere to report it to.
+    """
+    arguments = sys.argv[1:] if argv is None else argv
+    chosen = []
+    for argument in arguments:
+        if argument.startswith("-"):
+            continue
+        path = Path(argument)
+        if path.exists():
+            chosen.append(path)
+    return chosen
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -44,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     # its temporary host process, not by us.
     set_app_id(APP_ID)
 
-    MainWindow(settings).mainloop()
+    MainWindow(settings, preselect=preselected(argv)).mainloop()
     return 0
 
 

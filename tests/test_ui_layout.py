@@ -189,6 +189,24 @@ def test_no_screen_offers_two_ways_back(ui, screen):
     assert not duplicates, f"{screen} still has a second back button"
 
 
+def test_a_selection_from_the_command_line_opens_the_send_screen(ui, tmp_path):
+    # What the Explorer menu does: start the app with a path. It has
+    # to land on the screen that can act on it, already holding it.
+    from nowertransfer.ui.main_window import MainWindow
+    from nowertransfer.ui.views.send import SendView
+
+    chosen = tmp_path / "from-explorer.txt"
+    chosen.write_text("x", encoding="utf-8")
+
+    window = MainWindow(ui.window.settings, preselect=[chosen])
+    settle(window)
+    try:
+        assert isinstance(window._view, SendView)
+        assert window.send_paths == [chosen]
+    finally:
+        window.destroy()
+
+
 def test_the_role_cards_sit_under_the_header(ui):
     # They used to float in the middle of the window, because their
     # row took the spare height. The header, the cards and the resume

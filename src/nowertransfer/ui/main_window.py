@@ -37,7 +37,9 @@ _TERMINAL_EVENTS = frozenset(
 
 
 class MainWindow(ctk.CTk):
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self, settings: Settings, preselect: Sequence[Path] | None = None
+    ) -> None:
         super().__init__()
         ctk.set_appearance_mode("dark")
 
@@ -67,7 +69,13 @@ class MainWindow(ctk.CTk):
         self.content = ctk.CTkFrame(self, fg_color=COLORS.background)
         self.content.pack(fill="both", expand=True, padx=PAD_WINDOW, pady=20)
 
-        self.show_home()
+        # Started from the Explorer menu with a selection: go straight
+        # to the screen that can act on it.
+        if preselect:
+            self.send_paths = list(preselect)
+            self.show_send()
+        else:
+            self.show_home()
         self._poll_job = self.after(POLL_INTERVAL_MS, self._drain_events)
 
     def _apply_icon(self) -> None:
