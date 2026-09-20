@@ -90,7 +90,7 @@ class Harness:
 
     def settings(self, language: str, configured: bool) -> Settings:
         return Settings(
-            relay_host="ftp.nower.cloud:9009" if configured else "",
+            relay_host="relay.example.com:9009" if configured else "",
             relay_password="hunter2" if configured else "",
             language=language,
             download_dir=str(self.tmp_path),
@@ -129,6 +129,7 @@ class Harness:
 @pytest.fixture(scope="session")
 def ui(tmp_path_factory):
     from nowertransfer import config, session
+    from nowertransfer.ui import main_window as main_window_module
     from nowertransfer.ui.main_window import MainWindow
 
     tmp_path = tmp_path_factory.mktemp("ui-config")
@@ -138,9 +139,24 @@ def ui(tmp_path_factory):
     patch.setattr(config, "portable_config_path", lambda: tmp_path / "absent.toml")
     patch.setattr(config, "env_file_path", lambda: tmp_path / "absent.env")
     patch.setattr(session, "user_config_dir", lambda: tmp_path)
+    # No network from a layout test. The update check runs on a thread
+    # at startup and lands whenever it lands: once a release existed
+    # that was newer than the version under test, it added a gold dot
+    # to the start screen partway through the run, and whichever test
+    # was measuring the screen at that moment failed. Nothing here is
+    # about updates, so there is nothing to look for.
+    patch.setattr(main_window_module, "newer_than", lambda _version: None)
 
-    harness = Harness(MainWindow(Settings(download_dir=str(tmp_path))), tmp_path)
-    settle(harness.window)
+    window = MainWindow(Settings(download_dir=str(tmp_path)))
+    # The screens branch on whether croc was found, and CI has no
+    # vendored binary: without this the start screen shows the "croc
+    # missing" card instead of the role cards, and every test that
+    # measures them fails somewhere far away from the cause. Nothing
+    # here runs it - the layout only asks whether it exists.
+    window.croc_path = tmp_path / "croc-that-is-never-run"
+    settle(window)
+
+    harness = Harness(window, tmp_path)
     yield harness
     harness.window.destroy()
     patch.undo()
@@ -282,14 +298,14 @@ def test_the_relay_dot_says_what_the_relay_is_doing(ui, reachable, expect_gold):
     # It used to be gold whatever the relay was doing, which reads as
     # "all well" even when nothing is listening.
     from nowertransfer.ui.theme import COLORS
-    from nowertransfer.ui.widgets import StatusDot
 
     ui.window.relay_reachable = reachable
     try:
         view = ui.open("home")
-        dots = [child for child in _descendants(view) if isinstance(child, StatusDot)]
-        assert dots, "no relay dot on the screen"
-        colour = dots[0]._dot.cget("fg_color")
+        # The relay dot by name, not the first StatusDot on the
+        # screen: the update notice is one too, it is packed above
+        # this one, and it is always gold.
+        colour = view._relay_dot._dot.cget("fg_color")
     finally:
         ui.window.relay_reachable = None
 
