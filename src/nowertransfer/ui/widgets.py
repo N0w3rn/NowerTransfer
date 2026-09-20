@@ -364,9 +364,10 @@ class Stat(ctk.CTkFrame):
 class TransferPanel(ctk.CTkFrame):
     """Phase, progress and figures for a running transfer.
 
-    Only what is actually known is shown. croc reports no percentage
-    through a pipe, so the bar sweeps while a phase is in progress and
-    fills only when croc does report one; there is no invented speed or
+    Only what is actually known is shown. The bar sweeps until croc
+    reports a percentage and follows it from then on - a transfer that
+    finishes inside one of croc's redraws never reports one, which is
+    why the sweep has to exist. Nothing is invented: no speed, no
     estimated time.
     """
 

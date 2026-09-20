@@ -40,9 +40,9 @@ _CONFIG_ERROR_MARKERS = ("could not connect", *_RELAY_PASSWORD_MARKERS)
 
 _PROGRESS_PATTERN = re.compile(r"(\d{1,3})%")
 
-#: croc announces the incoming payload as: Receiving 'name' (6.0 MB).
-#: Through a pipe this is the only size the receiving side ever learns -
-#: croc prints no progress there, so nothing else reports one.
+#: croc announces the incoming payload as: Receiving 'name' (6.0 MB),
+#: which is how the receiving side learns the size before any byte of
+#: it has arrived.
 _INCOMING_PATTERN = re.compile(
     r"(?:Receiving|Sending)\s+'(?P<name>[^']+)'\s+\((?P<size>[^)]+)\)"
 )
@@ -222,6 +222,15 @@ class TransferWorker:
     def start_receive(self, code: str, target_dir: str | Path) -> None:
         target = Path(target_dir)
         # cwd matches --out so partial files land there too, not beside the .exe.
+        #
+        # --overwrite is what makes an interrupted receive resume, the
+        # opposite of how it reads. croc's own wording is "do not
+        # prompt to overwrite or resume": without it croc asks
+        # "Resume 'big.bin' (37.3%)? (y/N)", and --yes does not answer
+        # that particular prompt - measured, croc then skips the file
+        # and transfers nothing. With it, croc re-reads what is already
+        # on disk and carries on. Measured over a throttled 120 MB
+        # transfer: interrupted at 39%, the next run reached 90%.
         command = [
             str(self._croc),
             "--yes",

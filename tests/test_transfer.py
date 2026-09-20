@@ -404,6 +404,25 @@ def test_missing_relay_password_falls_back_to_crocs_default(monkeypatch):
     assert captured["env"]["CROC_PASS"] == CROC_DEFAULT_RELAY_PASSWORD
 
 
+def test_receiving_keeps_overwrite_so_it_can_resume(monkeypatch, tmp_path):
+    # Reads backwards and is easy to "clean up" into a bug. croc's own
+    # wording: "do not prompt to overwrite or resume". Without the
+    # flag croc asks "Resume 'big.bin' (37.3%)? (y/N)", --yes does not
+    # answer that prompt, and croc skips the file - measured, nothing
+    # transfers at all. With it, an interrupted 120 MB receive went
+    # from 39% to 90% on the next run instead of starting over.
+    captured = {}
+    monkeypatch.setattr(
+        TransferWorker,
+        "_start",
+        lambda self, command, code, cwd: captured.update(command=command),
+    )
+    make_worker(RelayEndpoint("r:9009")).start_receive("code", tmp_path)
+
+    assert "--overwrite" in captured["command"]
+    assert "--yes" in captured["command"]
+
+
 # ----------------------------------------------------------------------
 #  Giving up when nobody comes
 # ----------------------------------------------------------------------
