@@ -141,13 +141,22 @@ def ui(tmp_path_factory):
     patch.setattr(config, "portable_config_path", lambda: tmp_path / "absent.toml")
     patch.setattr(config, "env_file_path", lambda: tmp_path / "absent.env")
     patch.setattr(session, "user_config_dir", lambda: tmp_path)
-    # No network from a layout test. The update check runs on a thread
-    # at startup and lands whenever it lands: once a release existed
-    # that was newer than the version under test, it added a gold dot
-    # to the start screen partway through the run, and whichever test
-    # was measuring the screen at that moment failed. Nothing here is
-    # about updates, so there is nothing to look for.
+    # No background work may reach into these tests. Both checks the
+    # window runs are threads that write to the shared window whenever
+    # they happen to finish, so a slow answer lands in whatever test
+    # is measuring the screen at that moment - a different one each
+    # run, on a different machine each time.
+    #
+    # The update check added the update notice partway through a run,
+    # and its StatusDot is gold. Saving on the settings screen calls
+    # reload_settings, which starts a relay check; that answer set
+    # relay_reachable to False and painted the dot red inside the next
+    # test, which had just set it to True by hand.
+    #
+    # Neither is what this file is about: the dot tests set the state
+    # directly, and the checks have tests of their own.
     patch.setattr(main_window_module, "newer_than", lambda _version: None)
+    patch.setattr(MainWindow, "start_relay_check", lambda _self: None)
 
     window = MainWindow(Settings(download_dir=str(tmp_path)))
     # The screens branch on whether croc was found, and CI has no
@@ -290,6 +299,29 @@ def test_the_update_check_can_be_switched_off(ui, tmp_path, monkeypatch):
     settle(ui.window)
 
     assert config.load_settings().checks_for_updates is False
+
+
+def test_saving_settings_leaves_no_background_check_running(ui, tmp_path, monkeypatch):
+    # Measured: saving calls reload_settings, which starts a relay
+    # check on a thread and schedules a poll to collect it. The answer
+    # then arrived inside a later test, overwrote the state that test
+    # had set by hand, and repainted the dot under it - red where the
+    # test had asked for gold. It failed on one runner and not the
+    # other, which is what a race looks like from outside.
+    from nowertransfer import config
+
+    monkeypatch.setattr(config, "user_config_path", lambda: tmp_path / "config.toml")
+
+    ui.window.relay_reachable = True
+    try:
+        view = ui.open("settings")
+        view._save()
+        settle(ui.window)
+
+        assert ui.window._relay_job is None, "a poll is still scheduled"
+        assert ui.window.relay_reachable is True, "something answered for the relay"
+    finally:
+        ui.window.relay_reachable = None
 
 
 @pytest.mark.parametrize(
