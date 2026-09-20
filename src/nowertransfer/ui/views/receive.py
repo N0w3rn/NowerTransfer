@@ -10,6 +10,7 @@ import customtkinter as ctk
 
 from ...codes import is_our_code, is_plausible_code
 from ...paths import open_in_file_manager
+from ...session import clear_session, save_receive_session
 from ..theme import COLORS, GAP, PAD_CARD, RADIUS, RECEIVE_ACCENT, font, mono
 from ..widgets import caption, entry, hint, quiet_button
 from .base import TransferScreen
@@ -38,6 +39,18 @@ class ReceiveView(TransferScreen):
         self._code_entry.pack(fill="x", pady=(9, 0))
         self._code_entry.bind("<Return>", lambda _event: self.start_transfer())
         hint(parent, self.t("receive.code_help")).pack(anchor="w", pady=(7, 0))
+        self._prefill_code()
+
+    def _prefill_code(self) -> None:
+        """Put a phrase in the field when we already know one.
+
+        A resumed receive knows exactly which; otherwise the
+        clipboard may.
+        """
+        resumed = self.options.get("resume_code")
+        if isinstance(resumed, str) and resumed:
+            self._code_entry.insert(0, resumed)
+            return
         self._offer_the_clipboard()
 
     def _offer_the_clipboard(self) -> None:
@@ -98,8 +111,14 @@ class ReceiveView(TransferScreen):
         if not self.window.start_receive(code, self.window.receive_dir):
             self.complain(self.t("error.no_relay"))
             return
+        # Only once it is running: a resume point for a transfer that
+        # never started offers something that does not exist.
+        save_receive_session(code, self.window.receive_dir)
         self.enter_running()
         self.panel.set_phase(self.t("receive.connecting"))
+
+    def on_finished(self) -> None:
+        clear_session()
 
     def _show_finished(self) -> None:
         """Two ways on: straight to the files, or back to the start."""

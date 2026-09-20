@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import tkinter
 from contextlib import suppress
+from functools import partial
 
 import customtkinter as ctk
 
 from ... import __version__
 from ...config import RelayMode
 from ...paths import asset, open_link
-from ...session import load_send_session
+from ...session import load_receive_session, load_send_session
 from ..theme import COLORS, GAP, GOLD_ACCENT, RADIUS, RADIUS_LARGE, display, font, mono
 from ..widgets import Card, StatusDot, badge, hint, link_button, primary_button
 from .base import View
@@ -197,9 +198,24 @@ class HomeView(View):
         ).pack(side="right", padx=8)
 
     def _resume_link(self) -> None:
-        session = load_send_session()
-        if session is None:
+        """Offer to pick up whichever transfer was interrupted.
+
+        Either direction: a receive that stopped part way is worth as
+        much as a send, and croc carries on from what is already on
+        disk rather than starting over.
+        """
+        sending = load_send_session()
+        receiving = None if sending else load_receive_session()
+        if sending is None and receiving is None:
             return
+
+        if sending is not None:
+            code = sending.code
+            reopen = partial(self.window.show_send, resume=sending)
+        else:
+            code = receiving.code
+            reopen = partial(self.window.show_receive, resume=receiving)
+
         strip = ctk.CTkFrame(self, fg_color=COLORS.panel, corner_radius=RADIUS)
         strip.pack(fill="x", pady=(GAP, 0))
         ctk.CTkLabel(
@@ -208,15 +224,12 @@ class HomeView(View):
             font=font(12),
             text_color=COLORS.muted,
         ).pack(side="left", padx=(16, 10), pady=11)
-        ctk.CTkLabel(
-            strip, text=session.code, font=mono(12), text_color=COLORS.gold
-        ).pack(side="left")
-        link_button(
-            strip,
-            self.t("home.resume_open"),
-            lambda: self.window.show_send(resume=session),
-            width=90,
-        ).pack(side="right", padx=8)
+        ctk.CTkLabel(strip, text=code, font=mono(12), text_color=COLORS.gold).pack(
+            side="left"
+        )
+        link_button(strip, self.t("home.resume_open"), reopen, width=90).pack(
+            side="right", padx=8
+        )
 
     def _blocker(self, title: str, body: str, accent: str) -> None:
         card = Card(self, accent=accent)

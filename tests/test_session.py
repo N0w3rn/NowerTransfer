@@ -112,6 +112,65 @@ def test_corrupt_session_file_is_ignored():
 
 
 def test_clearing_is_idempotent():
-    session.clear_send_session()
-    session.clear_send_session()
+    session.clear_session()
+    session.clear_session()
     assert session.load_send_session() is None
+
+
+# ----------------------------------------------------------------------
+#  Receives are remembered too
+# ----------------------------------------------------------------------
+def test_a_receive_round_trips(tmp_path):
+    target = tmp_path / "downloads"
+    target.mkdir()
+
+    session.save_receive_session(CODE, target)
+    restored = session.load_receive_session()
+
+    assert restored is not None
+    assert restored.code == CODE
+    assert restored.target == str(target)
+
+
+@pytest.mark.skipif(
+    not secretstore.is_encrypting(),
+    reason="no OS keystore on this platform; values are stored in the clear",
+)
+def test_a_receive_is_not_stored_in_the_clear(tmp_path):
+    target = tmp_path / "tax returns"
+    target.mkdir()
+    session.save_receive_session(CODE, target)
+
+    stored = session.session_path().read_text(encoding="utf-8")
+    assert CODE not in stored
+    assert "tax returns" not in stored
+
+
+def test_a_receive_whose_folder_is_gone_is_not_offered(tmp_path):
+    target = tmp_path / "downloads"
+    target.mkdir()
+    session.save_receive_session(CODE, target)
+    target.rmdir()
+
+    assert session.load_receive_session() is None
+
+
+def test_the_two_directions_do_not_answer_for_each_other(tmp_path):
+    # One transfer runs at a time and one file holds it, so a stored
+    # send must not surface as a receive or the other way round.
+    payload = tmp_path / "payload.txt"
+    payload.write_text("hi", encoding="utf-8")
+
+    session.save_send_session(CODE, [str(payload)])
+    assert session.load_send_session() is not None
+    assert session.load_receive_session() is None
+
+    session.save_receive_session(CODE, tmp_path)
+    assert session.load_receive_session() is not None
+    assert session.load_send_session() is None
+
+
+def test_clearing_forgets_a_receive_too(tmp_path):
+    session.save_receive_session(CODE, tmp_path)
+    session.clear_session()
+    assert session.load_receive_session() is None

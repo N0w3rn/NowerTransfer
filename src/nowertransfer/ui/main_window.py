@@ -23,7 +23,7 @@ from ..croc import find_croc
 from ..i18n import Translator
 from ..paths import icon_path
 from ..relaycheck import reach
-from ..session import SendSession
+from ..session import ReceiveSession, SendSession
 from ..transfer import EventType, TransferEvent, TransferWorker
 from ..updates import Release, newer_than
 from . import winicon
@@ -216,7 +216,11 @@ class MainWindow(ctk.CTk):
             self.send_paths = [Path(p) for p in resume.paths]
         self._show(SendView)
 
-    def show_receive(self) -> None:
+    def show_receive(self, resume: ReceiveSession | None = None) -> None:
+        if resume is not None:
+            self.receive_dir = Path(resume.target)
+            self._show(ReceiveView, resume_code=resume.code)
+            return
         self._show(ReceiveView)
 
     def show_settings(self, message: str = "") -> None:
