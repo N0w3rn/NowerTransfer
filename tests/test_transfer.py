@@ -1,4 +1,6 @@
 import io
+import sys
+import time
 from pathlib import Path
 from queue import Queue
 
@@ -6,12 +8,14 @@ import pytest
 
 from nowertransfer.config import CROC_DEFAULT_RELAY_PASSWORD, RelayEndpoint
 from nowertransfer.transfer import (
+    ERROR_NO_PEER,
     ERROR_RELAY_PASSWORD,
     EventType,
     TransferWorker,
     is_hidden_output,
     iter_output_lines,
     looks_like_config_error,
+    looks_like_peer_arrived,
     looks_like_version_mismatch,
     looks_like_wrong_relay_password,
     parse_incoming,
@@ -398,3 +402,77 @@ def test_missing_relay_password_falls_back_to_crocs_default(monkeypatch):
     )
     make_worker(RelayEndpoint("r:9009")).start_send(["a.txt"], "code")
     assert captured["env"]["CROC_PASS"] == CROC_DEFAULT_RELAY_PASSWORD
+
+
+# ----------------------------------------------------------------------
+#  Giving up when nobody comes
+# ----------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        # Measured against a real relay. Both sides print their pair of
+        # addresses at the moment they connect, and nothing before it.
+        ("Sending (84.150.122.176->192.168.2.117)", True),
+        ("Receiving (192.168.2.117<-84.150.122.176)", True),
+        ("probe.bin   0% |    | ( 0 B/400 kB) [0s:0s]", True),
+        # The sending side prints these immediately, peer or no peer.
+        ("Sending 0 files (390.6 kB)", False),
+        ("Sending 'probe.bin' (390.6 kB)", False),
+        ("On the other computer, run:", False),
+        # The receiving side, still looking.
+        ("waiting for sender...", False),
+        ("authenticating code...", False),
+    ],
+)
+def test_only_the_address_pair_means_the_peer_arrived(line, expected):
+    assert looks_like_peer_arrived(line) is expected
+
+
+def _fake_croc(worker, script, **kwargs):
+    """Run the retry loop against a stand-in for croc."""
+    worker._run_until_done([sys.executable, "-c", script], "code", None)
+    emitted = []
+    while not worker._events.empty():
+        emitted.append(worker._events.get_nowait())
+    return emitted
+
+
+def test_a_croc_nobody_joins_is_given_up_on():
+    # A wrong code phrase makes croc wait, not complain, so nothing but
+    # a clock can tell the difference between a typo and a slow peer.
+    worker = TransferWorker(
+        Path("croc"), RelayEndpoint("r:9009"), Queue(), retry_delay=0, give_up_after=0.4
+    )
+    started = time.monotonic()
+    emitted = _fake_croc(
+        worker,
+        "import time; print('Sending 0 files (1 B)', flush=True); time.sleep(30)",
+    )
+    took = time.monotonic() - started
+
+    failed = [event for event in emitted if event.type is EventType.FAILED]
+    assert failed and failed[0].text == ERROR_NO_PEER
+    assert took < 10, f"waited {took:.1f}s; the watchdog did not fire"
+
+
+def test_a_transfer_that_started_is_left_alone():
+    # The deadline is for an empty room, not for a big file. Once the
+    # two sides have met, croc may take as long as it needs.
+    worker = TransferWorker(
+        Path("croc"), RelayEndpoint("r:9009"), Queue(), retry_delay=0, give_up_after=0.3
+    )
+    emitted = _fake_croc(
+        worker,
+        "import time;print('Sending (1.2.3.4->5.6.7.8)', flush=True);time.sleep(1.2)",
+    )
+
+    assert types(emitted)[-1] is EventType.FINISHED
+    assert not any(event.text == ERROR_NO_PEER for event in emitted)
+
+
+def test_the_deadline_can_be_switched_off():
+    worker = TransferWorker(
+        Path("croc"), RelayEndpoint("r:9009"), Queue(), retry_delay=0, give_up_after=0
+    )
+    emitted = _fake_croc(worker, "print('done')")
+    assert types(emitted)[-1] is EventType.FINISHED

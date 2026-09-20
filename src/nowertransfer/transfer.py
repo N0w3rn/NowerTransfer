@@ -48,6 +48,7 @@ _INCOMING_PATTERN = re.compile(
 )
 _LINE_SEPARATORS = re.compile(rb"[\r\n]")
 
+ERROR_NO_PEER = "error.no_peer"
 ERROR_RELAY_UNREACHABLE = "error.relay_unreachable"
 ERROR_RELAY_PASSWORD = "error.relay_password"
 ERROR_CROC_START_FAILED = "error.croc_start_failed"
@@ -65,6 +66,17 @@ _HIDDEN_OUTPUT = ("getcroc.com",)
 
 #: The relay password as croc echoes it: `--pass <value>`.
 _PASS_FLAG_PATTERN = re.compile(r"(--pass\s+)\S+")
+
+#: croc names both addresses the moment the two sides are connected:
+#: `Sending (a->b)` or `Receiving (a<-b)`. Measured against a real
+#: relay: the sending side prints nothing at all between its banner
+#: and this line, so it is the only thing that marks a peer arriving.
+_PEER_PATTERN = re.compile(r"(?:Sending|Receiving)\s*\([^)]*(?:->|<-)[^)]*\)")
+
+#: How long croc may sit in a room nobody else joins. A wrong code
+#: phrase is silent - croc waits rather than complaining - so without
+#: this the app waits with it, forever.
+GIVE_UP_WITHOUT_PEER_SECONDS = 240.0
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
@@ -133,6 +145,11 @@ def looks_like_wrong_relay_password(line: str) -> bool:
     return any(marker in lowered for marker in _RELAY_PASSWORD_MARKERS)
 
 
+def looks_like_peer_arrived(line: str) -> bool:
+    """True once croc has the other side on the line."""
+    return _PEER_PATTERN.search(line) is not None or parse_progress(line) is not None
+
+
 def looks_like_version_mismatch(line: str) -> bool:
     """True if the two sides are running incompatible croc versions."""
     lowered = line.lower()
@@ -172,16 +189,19 @@ class TransferWorker:
         events: Queue[TransferEvent],
         retry_delay: int = RETRY_DELAY_SECONDS,
         allow_public_fallback: bool = False,
+        give_up_after: float = GIVE_UP_WITHOUT_PEER_SECONDS,
     ) -> None:
         self._croc = croc
         self._relay = relay
         self._events = events
         self._retry_delay = retry_delay
         self._allow_public_fallback = allow_public_fallback
+        self._give_up_after = give_up_after
         self._cancelled = threading.Event()
         self._process: subprocess.Popen[bytes] | None = None
         self._thread: threading.Thread | None = None
         self._last_line = ""
+        self._gave_up = False
 
     # -- public API ----------------------------------------------------
     def start_send(self, paths: Sequence[str | Path], code: str) -> None:
@@ -267,6 +287,9 @@ class TransferWorker:
             if self._cancelled.is_set():
                 self._emit(EventType.CANCELLED)
                 return
+            if self._gave_up:
+                self._emit(EventType.FAILED, ERROR_NO_PEER)
+                return
             if exit_code == 0:
                 self._emit(EventType.FINISHED)
                 return
@@ -330,11 +353,48 @@ class TransferWorker:
             self._emit(EventType.FAILED, ERROR_CROC_START_FAILED, detail=str(error))
             return None
 
+        peer = threading.Event()
+        watchdog = threading.Thread(
+            target=self._give_up_without_a_peer,
+            args=(self._process, peer),
+            name="croc-watchdog",
+            daemon=True,
+        )
+        watchdog.start()
+
         assert self._process.stdout is not None
-        for line in iter_output_lines(self._process.stdout):
-            if is_hidden_output(line):
-                continue
-            line = redact(line)
-            self._last_line = line
-            self._emit(EventType.OUTPUT, line)
+        try:
+            for line in iter_output_lines(self._process.stdout):
+                if is_hidden_output(line):
+                    continue
+                line = redact(line)
+                self._last_line = line
+                if looks_like_peer_arrived(line):
+                    peer.set()
+                self._emit(EventType.OUTPUT, line)
+        finally:
+            # Either the peer turned up or croc is finished; nothing
+            # left for the watchdog to guard.
+            peer.set()
         return self._process.wait()
+
+    def _give_up_without_a_peer(
+        self, process: subprocess.Popen[bytes], peer: threading.Event
+    ) -> None:
+        """Stop croc if the other side never appears.
+
+        A wrong code phrase is silent: croc waits in a room nobody else
+        is in, and waits for as long as it is left alone. Waiting out a
+        peer who is merely slow is the point of the retry loop, so this
+        only fires while the two sides have not met - once they have,
+        the transfer may take as long as it takes.
+        """
+        if self._give_up_after <= 0:
+            return
+        if peer.wait(self._give_up_after):
+            return
+        if self._cancelled.is_set():
+            return
+        self._gave_up = True
+        with suppress(OSError):
+            process.terminate()

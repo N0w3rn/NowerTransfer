@@ -190,9 +190,12 @@ source version is written — `pyproject.toml` reads that same line.
 - **The relay password is a door lock, not a safe.** It keeps strangers
   from using your bandwidth. It does not protect file contents; those are
   encrypted before they ever reach the relay, which stores nothing.
-- **Dropped connections retry automatically** until the transfer completes
-  or the user cancels. An unreachable relay is told apart from a peer who
-  simply has not shown up yet.
+- **Dropped connections retry automatically**, and an unreachable relay is
+  told apart from a peer who simply has not shown up yet. A room nobody
+  else joins is given up on after four minutes: croc never says a code
+  phrase is wrong, it just waits, so a clock is the only thing that can
+  tell a typo from a slow peer. A transfer that has actually started is
+  never interrupted, however long it takes.
 - **Secrets on disk are encrypted to the Windows account** that wrote
   them, via DPAPI. That covers the relay password saved in the settings
   screen, and the code phrase *and file paths* of an interrupted send —

@@ -262,6 +262,20 @@ CATALOG: dict[str, dict[str, str]] = {
         "de": "Immer noch nichts — prüft, ob beide dieselbe Code-Phrase nutzen.",
     },
     # -- errors -------------------------------------------------------
+    #: croc never says a code phrase is wrong - it waits in a room
+    #: nobody joins - so this is what a mistyped one looks like.
+    "error.no_peer": {
+        "en": (
+            "Nobody came. The other side never connected. Check the code "
+            "phrase on both machines — it has to match exactly — and that "
+            "the other side has started."
+        ),
+        "de": (
+            "Niemand da. Die Gegenseite hat sich nicht verbunden. Prüft die "
+            "Code-Phrase auf beiden Rechnern — sie muss genau übereinstimmen "
+            "— und ob die Gegenseite gestartet hat."
+        ),
+    },
     "error.relay_unreachable": {
         "en": (
             "Cannot reach the relay. Is it running? Are host, port and relay "
