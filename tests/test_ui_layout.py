@@ -192,19 +192,27 @@ def test_no_screen_offers_two_ways_back(ui, screen):
 def test_a_selection_from_the_command_line_opens_the_send_screen(ui, tmp_path):
     # What the Explorer menu does: start the app with a path. It has
     # to land on the screen that can act on it, already holding it.
-    from nowertransfer.ui.main_window import MainWindow
+    # Through open_first_screen rather than a second MainWindow: Tk
+    # gives out only a handful of interpreters per process, and this
+    # file already leans on that by sharing one window.
+    from nowertransfer.ui.views.home import HomeView
     from nowertransfer.ui.views.send import SendView
 
     chosen = tmp_path / "from-explorer.txt"
     chosen.write_text("x", encoding="utf-8")
 
-    window = MainWindow(ui.window.settings, preselect=[chosen])
-    settle(window)
-    try:
-        assert isinstance(window._view, SendView)
-        assert window.send_paths == [chosen]
-    finally:
-        window.destroy()
+    ui.open("home")
+    ui.window.open_first_screen([chosen])
+    settle(ui.window)
+
+    assert isinstance(ui.window._view, SendView)
+    assert ui.window.send_paths == [chosen]
+
+    # And without a selection it lands where it always did.
+    ui.window.send_paths = []
+    ui.window.open_first_screen(None)
+    settle(ui.window)
+    assert isinstance(ui.window._view, HomeView)
 
 
 def test_a_newer_release_is_announced_on_the_start_screen(ui):

@@ -77,13 +77,7 @@ class MainWindow(ctk.CTk):
         self.content = ctk.CTkFrame(self, fg_color=COLORS.background)
         self.content.pack(fill="both", expand=True, padx=PAD_WINDOW, pady=20)
 
-        # Started from the Explorer menu with a selection: go straight
-        # to the screen that can act on it.
-        if preselect:
-            self.send_paths = list(preselect)
-            self.show_send()
-        else:
-            self.show_home()
+        self.open_first_screen(preselect)
         self._poll_job = self.after(POLL_INTERVAL_MS, self._drain_events)
         self._start_update_check()
 
@@ -107,6 +101,22 @@ class MainWindow(ctk.CTk):
         # Then the real thing: one image per size, which iconbitmap
         # does not do - see ui/winicon.py.
         winicon.apply_icon(self, icon)
+
+    def open_first_screen(self, preselect: Sequence[Path] | None) -> None:
+        """Where the app lands at start.
+
+        Started from the Explorer menu with a selection, that is the
+        screen which can act on it; otherwise the start screen. A
+        method rather than a few lines in ``__init__`` so it can be
+        exercised without building a second Tk root, which this app's
+        tests cannot afford - a handful of them and Tk stops making
+        interpreters.
+        """
+        if preselect:
+            self.send_paths = list(preselect)
+            self.show_send()
+        else:
+            self.show_home()
 
     # ------------------------------------------------------------------
     #  Update notice
