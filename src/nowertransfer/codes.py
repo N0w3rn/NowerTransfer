@@ -59,6 +59,10 @@ DIGIT_COUNT = 2
 #: Shortest input the receive screen accepts; below this it is a typo.
 MIN_CODE_LENGTH = 6
 
+#: For the membership test in is_our_code; the tuple is the source of
+#: truth, this is only faster to look in.
+_WORD_SET = frozenset(WORDS)
+
 _random = secrets.SystemRandom()
 
 
@@ -67,6 +71,27 @@ def generate_code() -> str:
     words = _random.sample(WORDS, WORD_COUNT)
     digits = "".join(str(_random.randrange(10)) for _ in range(DIGIT_COUNT))
     return "-".join([*words, digits])
+
+
+def is_our_code(text: str) -> bool:
+    """True only for a phrase this app could have generated.
+
+    Stricter than :func:`is_plausible_code`, which is a length check
+    and lets a stray sentence through. Nothing is filled in from the
+    clipboard on a guess: it must be exactly our shape - five words
+    from our own list, then the digits - or the field stays empty and
+    the user types.
+
+    A phrase from another croc client will not match, and that is the
+    right answer: this only offers a shortcut, it never blocks one.
+    """
+    parts = text.strip().lower().split("-")
+    if len(parts) != WORD_COUNT + 1:
+        return False
+    *words, digits = parts
+    if len(digits) != DIGIT_COUNT or not digits.isdigit():
+        return False
+    return all(word in _WORD_SET for word in words)
 
 
 def code_entropy_bits() -> float:

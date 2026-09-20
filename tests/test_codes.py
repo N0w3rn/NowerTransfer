@@ -3,6 +3,7 @@ import re
 import pytest
 
 from nowertransfer import codes
+from nowertransfer.codes import generate_code, is_our_code
 
 CODE_PATTERN = re.compile(rf"^[a-z]+(-[a-z]+){{{codes.WORD_COUNT - 1}}}-\d{{2}}$")
 
@@ -77,3 +78,56 @@ def test_generator_is_cryptographically_seeded():
 )
 def test_plausible_code(value, expected):
     assert codes.is_plausible_code(value) is expected
+
+
+# ----------------------------------------------------------------------
+#  Recognising one of our own phrases
+# ----------------------------------------------------------------------
+def test_a_phrase_we_generated_is_recognised():
+    for _ in range(50):
+        assert is_our_code(generate_code())
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Copied with the surrounding whitespace, or shouted.
+        "  falke-wolke-tiger-nebel-quarz-83  ",
+        "FALKE-WOLKE-TIGER-NEBEL-QUARZ-83",
+    ],
+)
+def test_spacing_and_case_do_not_matter(text):
+    assert is_our_code(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "",
+        "hello",
+        # Long enough for is_plausible_code, which is why that one
+        # cannot be trusted to fill a field from the clipboard.
+        "have a look at this please",
+        "https://example.com/some/path",
+        # Right shape, but the words are not ours.
+        "alpha-bravo-charlie-delta-echo-83",
+        # Our words, wrong count.
+        "falke-wolke-tiger-nebel-83",
+        "falke-wolke-tiger-nebel-quarz-rabe-83",
+        # Our words, but no digits where the digits go.
+        "falke-wolke-tiger-nebel-quarz-ab",
+        "falke-wolke-tiger-nebel-quarz-8",
+        # One typo is enough to make it not ours.
+        "falke-wolke-tiger-nebel-quarZz-83",
+    ],
+)
+def test_anything_else_is_not_ours(text):
+    assert not is_our_code(text)
+
+
+def test_it_is_stricter_than_the_length_check():
+    # The two exist for different jobs: one guards starting croc, the
+    # other decides whether to put text in front of the user.
+    loose = "have a look at this please"
+    assert codes.is_plausible_code(loose)
+    assert not is_our_code(loose)

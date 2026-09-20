@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import tkinter
 from pathlib import Path
 from tkinter import filedialog
 
 import customtkinter as ctk
 
-from ...codes import is_plausible_code
+from ...codes import is_our_code, is_plausible_code
 from ...paths import open_in_file_manager
 from ..theme import COLORS, GAP, PAD_CARD, RADIUS, RECEIVE_ACCENT, font, mono
 from ..widgets import caption, entry, hint, quiet_button
@@ -37,6 +38,27 @@ class ReceiveView(TransferScreen):
         self._code_entry.pack(fill="x", pady=(9, 0))
         self._code_entry.bind("<Return>", lambda _event: self.start_transfer())
         hint(parent, self.t("receive.code_help")).pack(anchor="w", pady=(7, 0))
+        self._offer_the_clipboard()
+
+    def _offer_the_clipboard(self) -> None:
+        """Fill the field if the clipboard holds one of our phrases.
+
+        The sender copies the phrase and the receiver pastes it, every
+        single time, so doing it for them saves the most common
+        keystroke in the app.
+
+        Only on a certainty, never a guess: ``is_our_code`` requires
+        our exact shape, five words from our own list plus the digits.
+        Anything else - a sentence, a URL, a phrase from another croc
+        client - leaves the field empty rather than putting something
+        wrong in front of the user.
+        """
+        try:
+            pasted = self.window.clipboard_get()
+        except tkinter.TclError:
+            return  # empty, or holding something that is not text
+        if is_our_code(pasted):
+            self._code_entry.insert(0, pasted.strip().lower())
 
     def _target_row(self, parent: ctk.CTkFrame) -> None:
         card = ctk.CTkFrame(parent, fg_color=COLORS.panel, corner_radius=RADIUS)

@@ -349,6 +349,34 @@ def test_the_focused_card_looks_focused(ui):
     assert second.master.cget("border_width") == 2
 
 
+@pytest.mark.parametrize(
+    ("clipboard", "filled"),
+    [
+        ("falke-wolke-tiger-nebel-quarz-83", True),
+        ("  FALKE-WOLKE-TIGER-NEBEL-QUARZ-83 ", True),
+        # Everything that is not unmistakably one of ours stays out of
+        # the field: putting the wrong thing in front of someone is
+        # worse than making them paste it.
+        ("have a look at this please", False),
+        ("https://example.com/holiday.zip", False),
+        ("alpha-bravo-charlie-delta-echo-83", False),
+        ("", False),
+    ],
+)
+def test_the_receive_field_only_takes_a_certain_code(ui, clipboard, filled):
+    ui.window.clipboard_clear()
+    if clipboard:
+        ui.window.clipboard_append(clipboard)
+    settle(ui.window)
+
+    view = ui.open("receive")
+
+    got = view._code_entry.get()
+    assert bool(got) is filled, f"clipboard {clipboard!r} produced {got!r}"
+    if filled:
+        assert got == clipboard.strip().lower()
+
+
 def test_the_role_cards_sit_under_the_header(ui):
     # They used to float in the middle of the window, because their
     # row took the spare height. The header, the cards and the resume
