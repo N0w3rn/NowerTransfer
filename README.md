@@ -22,6 +22,15 @@ handles the encryption, the NAT traversal and the relay protocol.
 > secrets are only encrypted at rest on Windows (see below). Treat other
 > platforms as untested rather than unsupported.
 
+<p align="center">
+  <img src="docs/screenshots/start.png" alt="The start screen: Send and Receive" width="420">
+  <img src="docs/screenshots/send.png" alt="The send screen, showing the code phrase" width="420">
+</p>
+<p align="center">
+  <img src="docs/screenshots/receive.png" alt="The receive screen: enter the code phrase" width="420">
+  <img src="docs/screenshots/settings.png" alt="The settings screen: which relay to use" width="420">
+</p>
+
 ---
 
 ## Setup

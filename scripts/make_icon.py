@@ -11,10 +11,17 @@ What it does write is ``assets/logo-88.png``, the mark the start screen
 draws, rendered from ``assets/logo.png``.
 
     python scripts/make_icon.py
+    python scripts/make_icon.py --add-missing-sizes
+
+The second form fills gaps in the .ico from its own largest frame,
+leaving every drawn frame untouched. Redrawing the missing sizes in
+an icon editor is better still; this only beats letting Windows
+rescale at draw time.
 """
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageFilter
@@ -77,7 +84,49 @@ def report_icon() -> None:
         )
 
 
+def add_missing_sizes() -> int:
+    """Render the sizes the .ico lacks, leaving the drawn ones alone.
+
+    Only ever called with an explicit flag. The .ico is artwork: the
+    frames already in it are written back byte for byte, and the gaps
+    are filled from the largest one, which still beats Windows
+    rescaling at draw time.
+    """
+    if not ICON.is_file():
+        raise SystemExit(f"error: {ICON} is missing")
+
+    frames: dict[int, Image.Image] = {}
+    with Image.open(ICON) as icon:
+        for width, height in sorted(icon.info.get("sizes", ())):
+            icon.size = (width, height)
+            icon.load()
+            frames[width] = icon.convert("RGBA").copy()
+
+    missing = [size for size in WANTED_ICON_SIZES if size not in frames]
+    if not missing:
+        print(f"{ICON.name} already has every size")
+        return 0
+
+    largest = frames[max(frames)]
+    for size in missing:
+        frames[size] = render(largest, size)
+    print(f"rendered {missing} from the {largest.width}px frame")
+
+    ordered = [frames[size] for size in sorted(frames)]
+    ordered[-1].save(
+        ICON,
+        format="ICO",
+        sizes=[(size, size) for size in sorted(frames)],
+        append_images=ordered[:-1],
+    )
+    print(f"wrote {ICON.name}: {', '.join(str(s) for s in sorted(frames))}")
+    return 0
+
+
 def main() -> int:
+    if "--add-missing-sizes" in sys.argv[1:]:
+        return add_missing_sizes()
+
     if not SOURCE.is_file():
         raise SystemExit(f"error: {SOURCE} is missing")
 
