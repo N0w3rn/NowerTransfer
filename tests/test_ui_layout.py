@@ -28,7 +28,7 @@ from nowertransfer.i18n import Translator  # noqa: E402
 REQUIRED = os.environ.get("NOWERTRANSFER_UI_TESTS") == "required"
 
 #: Default, and the minimum, where anything too big shows up first.
-SIZES = ["640x580", "580x540"]
+SIZES = ["720x620", "690x600"]
 LANGUAGES = ["de", "en"]
 SCREENS = ["home", "send", "receive", "settings"]
 

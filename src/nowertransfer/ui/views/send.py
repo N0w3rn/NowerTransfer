@@ -10,11 +10,11 @@ from tkinter import filedialog
 
 import customtkinter as ctk
 
-from ...codes import generate_code
+from ...codes import code_entropy_bits, generate_code
 from ...paths import human_size, total_size
 from ...session import clear_send_session, save_send_session
-from ..theme import COLORS, PAD_CARD, SEND_ACCENT, font, mono
-from ..widgets import Card, link_button, quiet_button
+from ..theme import COLORS, GAP, PAD_CARD, RADIUS_LARGE, SEND_ACCENT, font, mono
+from ..widgets import Card, caption, link_button, quiet_button
 from .base import TransferScreen
 
 #: How often the main thread checks whether the size is known yet.
@@ -25,69 +25,103 @@ class SendView(TransferScreen):
     accent = SEND_ACCENT
 
     def build(self) -> None:
-        self.header(self.t("send.subtitle"))
-        self._selection_card()
-        self._code_card()
+        bar = self.title_bar(self.t("home.send.title"), "▲")
+        ctk.CTkLabel(
+            bar, text=self.t("send.step"), font=font(11), text_color=COLORS.faint
+        ).pack(side="right")
+
+        area = self.setup_area()
+        self._drop_zone(area)
+        self._selection_row(area)
+        self._code_card(area)
         self.build_action_area(self.t("send.start"))
+        self.footnote.configure(text=self.t("send.recipient_needs"))
         self._measure_selection()
 
     # ------------------------------------------------------------------
-    def _selection_card(self) -> None:
-        card = Card(self)
-        card.pack(fill="x")
+    def _drop_zone(self, parent: ctk.CTkFrame) -> None:
+        zone = ctk.CTkFrame(
+            parent,
+            fg_color=COLORS.well,
+            corner_radius=RADIUS_LARGE,
+            border_width=1,
+            border_color=COLORS.border,
+        )
+        zone.pack(fill="x", pady=(18, 0))
 
-        buttons = card.row()
+        ctk.CTkLabel(zone, text="⤓", font=font(22), text_color=COLORS.muted).pack(
+            pady=(18, 0)
+        )
+        ctk.CTkLabel(
+            zone,
+            text=self.t("send.drop_here"),
+            font=font(13),
+            text_color=COLORS.text,
+        ).pack(pady=(6, 0))
+
+        buttons = ctk.CTkFrame(zone, fg_color="transparent")
+        buttons.pack(pady=(14, 20))
         ctk.CTkButton(
             buttons,
             text=self.t("send.choose_folder"),
             width=140,
+            height=34,
+            corner_radius=9,
             fg_color=self.accent.color,
             hover_color=self.accent.hover,
             text_color=self.accent.ink,
-            font=font(13, bold=True),
+            font=font(12, bold=True),
             command=self._choose_folder,
         ).pack(side="left")
-        quiet_button(buttons, self.t("send.choose_files"), self._choose_files).pack(
-            side="left", padx=8
-        )
+        quiet_button(
+            buttons, self.t("send.choose_files"), self._choose_files, width=140
+        ).pack(side="left", padx=(10, 0))
 
+    def _selection_row(self, parent: ctk.CTkFrame) -> None:
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", pady=(GAP, 0))
         self._selection_label = ctk.CTkLabel(
-            card,
+            row,
             text=self._selection_text(),
             text_color=COLORS.muted,
             font=font(12),
-            wraplength=500,
+            wraplength=560,
             justify="left",
             anchor="w",
         )
-        self._selection_label.pack(anchor="w", padx=PAD_CARD, pady=(8, PAD_CARD))
+        self._selection_label.pack(anchor="w", padx=4)
 
-    def _code_card(self) -> None:
-        card = Card(self, accent=self.accent.color)
-        card.pack(fill="x", pady=12)
-        card.caption(self.t("send.code_label"))
+    def _code_card(self, parent: ctk.CTkFrame) -> None:
+        card = Card(parent, accent=self.accent.color)
+        card.pack(fill="x", pady=(GAP, 0))
 
-        # Its own line, wrapped: five words run to some 45 characters,
-        # which will not share a row with the buttons.
+        head = card.row(pady=(PAD_CARD, 0))
+        caption(head, self.t("send.code_label")).pack(side="left")
+
         self._code_label = ctk.CTkLabel(
             card,
             text=self.window.send_code,
-            font=mono(17, bold=True),
+            font=mono(19, bold=True),
             text_color=self.accent.color,
-            wraplength=520,
+            wraplength=540,
             justify="left",
             anchor="w",
         )
-        self._code_label.pack(fill="x", padx=PAD_CARD, pady=(2, 0))
+        self._code_label.pack(fill="x", padx=PAD_CARD, pady=(8, 0))
 
-        row = ctk.CTkFrame(card, fg_color="transparent")
-        row.pack(fill="x", padx=PAD_CARD, pady=(4, PAD_CARD))
-        link_button(row, self.t("send.copy"), self._copy_code, width=90).pack(
-            side="right"
+        row = card.row(pady=(12, PAD_CARD))
+        quiet_button(row, self.t("send.copy"), self._copy_code, width=110).pack(
+            side="left"
         )
-        link_button(row, self.t("send.regenerate"), self._new_code, width=100).pack(
-            side="right", padx=(0, 4)
+        link_button(row, self.t("send.regenerate"), self._new_code, width=110).pack(
+            side="left", padx=(8, 0)
         )
+        ctk.CTkLabel(
+            row,
+            text=self.t("send.entropy", bits=round(code_entropy_bits())),
+            font=font(11),
+            text_color=COLORS.faint,
+        ).pack(side="right")
 
     # ------------------------------------------------------------------
     def _selection_text(self, size: str = "") -> str:
@@ -99,7 +133,7 @@ class SendView(TransferScreen):
             if len(paths) == 1
             else self.t("send.many_selected", count=len(paths))
         )
-        return f"{what}  ·  {size}" if size else what
+        return f"{what}   ·   {size}" if size else what
 
     def _refresh_selection(self) -> None:
         self._selection_label.configure(text=self._selection_text())
@@ -134,6 +168,8 @@ class SendView(TransferScreen):
             # The selection may have changed while we were counting.
             if paths == self.window.send_paths:
                 self._selection_label.configure(text=self._selection_text(measured[0]))
+                self.panel.set_stat("size", measured[0])
+                self.panel.set_stat("items", str(len(paths)))
 
     def _choose_folder(self) -> None:
         chosen = filedialog.askdirectory(title=self.t("send.folder_dialog"))
@@ -149,7 +185,7 @@ class SendView(TransferScreen):
 
     def _copy_code(self) -> None:
         self.window.copy_to_clipboard(self.window.send_code)
-        self.panel.set_status(self.t("send.copied"))
+        self.complain(self.t("send.copied"))
 
     def _new_code(self) -> None:
         if self.window.transfer_running:
@@ -160,10 +196,10 @@ class SendView(TransferScreen):
     # ------------------------------------------------------------------
     def start_transfer(self) -> None:
         if not self.window.send_paths:
-            self.panel.set_status(self.t("send.need_selection"), error=True)
+            self.complain(self.t("send.need_selection"))
             return
         if not self.window.start_send(self.window.send_paths, self.window.send_code):
-            self.panel.set_status(self.t("error.no_relay"), error=True)
+            self.complain(self.t("error.no_relay"))
             return
         # Only once it is actually running: a session saved for a
         # transfer that never started offers a resume for nothing.
@@ -171,7 +207,10 @@ class SendView(TransferScreen):
             self.window.send_code, [str(p) for p in self.window.send_paths]
         )
         self.enter_running()
-        self.panel.set_status(self.t("send.connecting"))
+        self.panel.set_phase(self.t("send.connecting"))
+
+    def finished_text(self) -> str:
+        return self.t("done.sent")
 
     def on_finished(self) -> None:
         clear_send_session()

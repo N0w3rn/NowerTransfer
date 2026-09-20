@@ -7,95 +7,225 @@ screen, so there is only ever one way to change it.
 
 from __future__ import annotations
 
+import threading
+import tkinter
+from contextlib import suppress
+
 import customtkinter as ctk
 
 from ...config import RelayMode, save_settings, with_relay
-from ..theme import COLORS, GAP, GOLD_ACCENT, NEUTRAL_ACCENT, PAD_CARD, font
-from ..widgets import Card, primary_button
+from ...relaycheck import RelayCheck, RelayStatus, check
+from ..theme import COLORS, GAP, GOLD_ACCENT, NEUTRAL_ACCENT, RADIUS, font, mono
+from ..widgets import StatusDot, caption, entry, hint, outline_button, primary_button
 from .base import View
+
+_CHECK_POLL_MS = 120
 
 
 class SettingsView(View):
     accent = NEUTRAL_ACCENT
 
     def build(self) -> None:
-        self.header(self.t("settings.title"), with_language=True)
+        bar = self.title_bar(self.t("settings.title"))
+        self.language_switch(bar).pack(side="right")
 
         #: Register with _needs_own_relay; _sync_relay_fields switches
         #: them as a group. A relay-only widget added without that call
         #: stays editable in PUBLIC mode.
         self._own_relay_only: list[ctk.CTkBaseClass] = []
 
-        # Packed against the bottom first: packed last, pack() squeezes
-        # them to nothing when the screen outgrows the window.
-        self.back_button(side="bottom")
-        self._message = ctk.CTkLabel(
-            self,
-            text=str(self.options.get("message", "")),
-            font=font(12),
-            text_color=COLORS.muted,
-            wraplength=540,
-            justify="left",
-            anchor="w",
-        )
-        self._message.pack(side="bottom", fill="x", pady=(6, 0))
-        primary_button(self, self.t("settings.save"), GOLD_ACCENT, self._save).pack(
-            side="bottom", fill="x", pady=(8, 0)
-        )
-
-        # Scrolls: three cards already exceed the minimum window height.
-        self._body = ctk.CTkScrollableFrame(
-            self, fg_color="transparent", scrollbar_button_color=COLORS.panel_active
-        )
-        self._body.pack(fill="both", expand=True)
+        self.back_button = ctk.CTkFrame(self, fg_color="transparent", height=1)
+        self._footer()
 
         if not self.window.settings.is_configured:
-            self._intro()
-        self._mode_card()
-        self._relay_card()
+            hint(self, self.t("setup.body"), width=600).pack(
+                anchor="w", fill="x", pady=(18, 0)
+            )
+
+        self._mode_group()
+        self._relay_fields()
+        self._check_row()
         self._sync_relay_fields()
 
     # ------------------------------------------------------------------
-    def _intro(self) -> None:
-        ctk.CTkLabel(
-            self._body,
-            text=self.t("setup.body"),
-            font=font(12),
-            text_color=COLORS.muted,
-            wraplength=540,
-            justify="left",
-            anchor="w",
-        ).pack(fill="x", pady=(0, 10))
+    def _footer(self) -> None:
+        from ..widgets import link_button
 
-    def _mode_card(self) -> None:
-        card = Card(self._body)
-        card.pack(fill="x", pady=(0, GAP))
-        card.caption(self.t("settings.relay_mode"))
-        row = card.row(pady=(4, 0))
+        link_button(self, self.t("nav.back"), self.window.show_home, width=90).pack(
+            side="bottom", anchor="w", pady=(GAP, 0)
+        )
+
+        row = ctk.CTkFrame(self, fg_color="transparent")
+        row.pack(side="bottom", fill="x", pady=(GAP, 0))
+        primary_button(row, self.t("settings.save"), GOLD_ACCENT, self._save).pack(
+            side="left"
+        )
+        self._message = ctk.CTkLabel(
+            row,
+            # `or`, not a default: navigating here passes message="".
+            text=str(self.options.get("message") or self.t("settings.encrypted_note")),
+            font=font(11),
+            text_color=COLORS.faint,
+            wraplength=380,
+            justify="left",
+        )
+        self._message.pack(side="left", padx=(14, 0))
+
+    def _mode_group(self) -> None:
+        caption(self, self.t("settings.relay_mode")).pack(anchor="w", pady=(22, 0))
 
         self._mode_labels = {
             mode: self.t(f"settings.relay_mode.{mode.value}") for mode in RelayMode
         }
         self._mode = ctk.CTkSegmentedButton(
-            row,
+            self,
             values=list(self._mode_labels.values()),
-            height=32,
+            height=36,
+            corner_radius=10,
             font=font(12),
-            fg_color=COLORS.background,
-            selected_color=COLORS.panel_active,
-            selected_hover_color=COLORS.panel_active,
-            unselected_color=COLORS.panel,
+            fg_color=COLORS.well,
+            selected_color=COLORS.gold,
+            selected_hover_color=COLORS.gold_hover,
+            unselected_color=COLORS.well,
             unselected_hover_color=COLORS.panel_hover,
             text_color=COLORS.text,
+            text_color_disabled=COLORS.faint,
             command=self._sync_relay_fields,
         )
         current = RelayMode.parse(
             self._draft("draft_mode", self.window.settings.relay_mode)
         )
         self._mode.set(self._mode_labels[current])
-        self._mode.pack(side="left", fill="x", expand=True)
-        card.hint(self.t("settings.relay_mode_hint"))
+        self._mode.pack(fill="x", pady=(9, 0))
+        hint(self, self.t("settings.relay_mode_hint"), width=600).pack(
+            anchor="w", fill="x", pady=(8, 0)
+        )
 
+    def _relay_fields(self) -> None:
+        settings = self.window.settings
+
+        columns = ctk.CTkFrame(self, fg_color="transparent")
+        columns.pack(fill="x", pady=(20, 0))
+        columns.grid_columnconfigure((0, 1), weight=1, uniform="fields")
+
+        left = ctk.CTkFrame(columns, fg_color="transparent")
+        left.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        caption(left, self.t("settings.relay_host")).pack(anchor="w")
+        self._host_entry = entry(
+            left, placeholder=self.t("settings.relay_host_placeholder")
+        )
+        self._host_entry.insert(0, self._draft("draft_host", settings.relay_host))
+        self._host_entry.pack(fill="x", pady=(8, 0))
+        self._needs_own_relay(self._host_entry)
+        hint(left, self._source_text("relay_host"), width=270).pack(
+            anchor="w", pady=(7, 0)
+        )
+
+        right = ctk.CTkFrame(columns, fg_color="transparent")
+        right.grid(row=0, column=1, sticky="ew", padx=(8, 0))
+        caption(right, self.t("settings.relay_password")).pack(anchor="w")
+        self._password_entry = entry(
+            right,
+            placeholder=self.t("settings.relay_password_placeholder"),
+            show="•",
+        )
+        self._password_entry.insert(
+            0, self._draft("draft_password", settings.relay_password)
+        )
+        self._password_entry.pack(fill="x", pady=(8, 0))
+        self._needs_own_relay(self._password_entry)
+
+        under = ctk.CTkFrame(right, fg_color="transparent")
+        under.pack(fill="x", pady=(7, 0))
+        hint(under, self.t("settings.password_note"), width=200).pack(
+            side="left", fill="x", expand=True
+        )
+        self._reveal = ctk.CTkCheckBox(
+            under,
+            text=self.t("settings.show_password"),
+            font=font(11),
+            text_color=COLORS.faint,
+            text_color_disabled=COLORS.faint,
+            width=70,
+            checkbox_width=15,
+            checkbox_height=15,
+            corner_radius=4,
+            border_width=1,
+            border_color=COLORS.border,
+            fg_color=COLORS.gold,
+            hover_color=COLORS.gold_hover,
+            checkmark_color=COLORS.ink,
+            command=self._toggle_password,
+        )
+        self._reveal.pack(side="right")
+        self._needs_own_relay(self._reveal)
+
+    def _toggle_password(self) -> None:
+        self._password_entry.configure(show="" if self._reveal.get() else "•")
+
+    def _check_row(self) -> None:
+        card = ctk.CTkFrame(self, fg_color=COLORS.panel, corner_radius=RADIUS)
+        card.pack(fill="x", pady=(18, 0))
+
+        self._check_button = outline_button(
+            card, self.t("relay.test"), self._run_check, width=150
+        )
+        self._check_button.pack(side="left", padx=(14, 0), pady=13)
+        self._needs_own_relay(self._check_button)
+
+        self._check_status = StatusDot(card, "", COLORS.faint)
+        self._check_status.pack(side="left", padx=(14, 0))
+
+        self._latency = ctk.CTkLabel(
+            card, text="", font=mono(11), text_color=COLORS.faint
+        )
+        self._latency.pack(side="right", padx=14)
+
+    # ------------------------------------------------------------------
+    def _run_check(self) -> None:
+        """Ask the relay, in the background; tk stays on its own thread."""
+        relay = with_relay(
+            self.window.settings,
+            self._host_entry.get(),
+            self._password_entry.get(),
+        ).relay
+        self._check_status.set(self.t("relay.checking"), COLORS.muted)
+        self._latency.configure(text="")
+        self._check_button.configure(state="disabled")
+
+        result: list[RelayCheck] = []
+        threading.Thread(
+            target=lambda: result.append(check(relay, self.window.croc_path)),
+            name="relay-check",
+            daemon=True,
+        ).start()
+        self._collect_check(result)
+
+    def _collect_check(self, result: list[RelayCheck]) -> None:
+        with suppress(tkinter.TclError):
+            if not self.winfo_exists():
+                return
+            if not result:
+                self.after(_CHECK_POLL_MS, self._collect_check, result)
+                return
+
+            outcome = result[0]
+            texts = {
+                RelayStatus.REACHABLE: (self.t("relay.reachable"), COLORS.gold),
+                RelayStatus.WRONG_PASSWORD: (
+                    self.t("error.relay_password"),
+                    COLORS.error,
+                ),
+                RelayStatus.UNREACHABLE: (self.t("relay.unreachable"), COLORS.error),
+            }
+            text, color = texts[outcome.status]
+            self._check_status.set(text, color)
+            self._latency.configure(
+                text=f"{outcome.milliseconds} ms" if outcome.milliseconds else ""
+            )
+            self._check_button.configure(state="normal")
+
+    # ------------------------------------------------------------------
     def capture_state(self) -> dict[str, object]:
         return {
             "draft_host": self._host_entry.get(),
@@ -109,7 +239,6 @@ class SettingsView(View):
         return value if isinstance(value, str) else stored
 
     def _needs_own_relay(self, widget: ctk.CTkBaseClass) -> ctk.CTkBaseClass:
-        """Mark a widget as meaningless without a relay of one's own."""
         self._own_relay_only.append(widget)
         return widget
 
@@ -126,8 +255,8 @@ class SettingsView(View):
                 # CTkEntry has no text_color_disabled: without this it
                 # would look editable and silently ignore typing.
                 widget.configure(
-                    text_color=COLORS.text if usable else COLORS.muted,
-                    fg_color=COLORS.background if usable else COLORS.panel_hover,
+                    text_color=COLORS.text if usable else COLORS.faint,
+                    fg_color=COLORS.well if usable else COLORS.panel,
                 )
 
     def _selected_mode(self) -> RelayMode:
@@ -137,73 +266,9 @@ class SettingsView(View):
                 return mode
         return RelayMode.OWN
 
-    def _relay_card(self) -> None:
-        settings = self.window.settings
-
-        card = Card(self._body)
-        card.pack(fill="x", pady=(0, GAP))
-        card.caption(self.t("settings.relay_host"))
-        self._host_entry = ctk.CTkEntry(
-            card,
-            font=font(14),
-            height=38,
-            fg_color=COLORS.background,
-            border_color=COLORS.panel_hover,
-            text_color=COLORS.text,
-            placeholder_text=self.t("settings.relay_host_placeholder"),
-        )
-        self._host_entry.insert(0, self._draft("draft_host", settings.relay_host))
-        self._host_entry.pack(fill="x", padx=PAD_CARD, pady=(4, 0))
-        self._needs_own_relay(self._host_entry)
-        card.hint(
-            f"{self.t('settings.relay_host_hint')}  ({self._source_text('relay_host')})"
-        )
-
-        password_card = Card(self._body)
-        password_card.pack(fill="x", pady=(0, GAP))
-        password_card.caption(self.t("settings.relay_password"))
-        row = password_card.row(pady=(4, 0))
-        self._password_entry = ctk.CTkEntry(
-            row,
-            font=font(14),
-            height=38,
-            fg_color=COLORS.background,
-            border_color=COLORS.panel_hover,
-            text_color=COLORS.text,
-            placeholder_text=self.t("settings.relay_password_placeholder"),
-            show="•",
-        )
-        self._password_entry.insert(
-            0, self._draft("draft_password", settings.relay_password)
-        )
-        self._password_entry.pack(side="left", fill="x", expand=True)
-        self._needs_own_relay(self._password_entry)
-
-        self._reveal = ctk.CTkCheckBox(
-            row,
-            text=self.t("settings.show_password"),
-            font=font(11),
-            text_color=COLORS.muted,
-            width=90,
-            checkbox_width=18,
-            checkbox_height=18,
-            fg_color=COLORS.gold,
-            hover_color=COLORS.gold_hover,
-            command=self._toggle_password,
-        )
-        self._reveal.pack(side="left", padx=(10, 0))
-        self._needs_own_relay(self._reveal)
-        password_card.hint(
-            f"{self.t('settings.relay_password_hint')}  "
-            f"({self._source_text('relay_password')})"
-        )
-
     def _source_text(self, key: str) -> str:
         source = self.window.settings.source_of(key)
         return self.t("settings.source", source=self.t(f"source.{source.value}"))
-
-    def _toggle_password(self) -> None:
-        self._password_entry.configure(show="" if self._reveal.get() else "•")
 
     # ------------------------------------------------------------------
     def _save(self) -> None:

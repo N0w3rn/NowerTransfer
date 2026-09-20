@@ -39,6 +39,13 @@ _RELAY_PASSWORD_MARKERS = (
 _CONFIG_ERROR_MARKERS = ("could not connect", *_RELAY_PASSWORD_MARKERS)
 
 _PROGRESS_PATTERN = re.compile(r"(\d{1,3})%")
+
+#: croc announces the incoming payload as: Receiving 'name' (6.0 MB).
+#: Through a pipe this is the only size the receiving side ever learns -
+#: croc prints no progress there, so nothing else reports one.
+_INCOMING_PATTERN = re.compile(
+    r"(?:Receiving|Sending)\s+'(?P<name>[^']+)'\s+\((?P<size>[^)]+)\)"
+)
 _LINE_SEPARATORS = re.compile(rb"[\r\n]")
 
 ERROR_RELAY_UNREACHABLE = "error.relay_unreachable"
@@ -85,6 +92,14 @@ def parse_progress(line: str) -> float | None:
     if match is None:
         return None
     return min(100, int(match.group(1))) / 100
+
+
+def parse_incoming(line: str) -> tuple[str, str] | None:
+    """``(name, size)`` from croc's announcement of the payload."""
+    match = _INCOMING_PATTERN.search(line)
+    if match is None:
+        return None
+    return match.group("name"), match.group("size").strip()
 
 
 def is_hidden_output(line: str) -> bool:

@@ -73,8 +73,10 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "C4", "PTH"]
 [tool.ruff.lint.per-file-ignores]
 # The word list is hand-wrapped so it stays readable as a block.
 "src/nowertransfer/codes.py" = ["E501"]
-# Natural-language UI strings legitimately use typographic dashes.
+# Natural-language UI strings legitimately use typographic dashes, and
+# the screens draw arrows and chevrons as text.
 "src/nowertransfer/i18n.py" = ["RUF001"]
+"src/nowertransfer/ui/views/*.py" = ["RUF001"]
 # sys.path has to be prepared before the local imports.
 "scripts/build.py" = ["E402"]
 "scripts/make_installer.py" = ["E402"]

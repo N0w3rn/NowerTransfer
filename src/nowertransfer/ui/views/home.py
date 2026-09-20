@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
+import tkinter
+from contextlib import suppress
+
 import customtkinter as ctk
 
 from ... import __version__
 from ...config import RelayMode
+from ...paths import asset
 from ...session import load_send_session
-from ..theme import COLORS, GOLD_ACCENT, font
-from ..widgets import Card, link_button, primary_button
+from ..theme import COLORS, GAP, GOLD_ACCENT, RADIUS, RADIUS_LARGE, display, font, mono
+from ..widgets import Card, StatusDot, hint, link_button, primary_button
 from .base import View
 
 
 class HomeView(View):
     def build(self) -> None:
-        self.header(self.t("app.tagline"), with_language=True)
+        self._header()
 
         if self.window.croc_path is None:
             self._blocker(
@@ -23,10 +27,7 @@ class HomeView(View):
         elif not self.window.settings.is_configured:
             self._blocker(self.t("setup.title"), self.t("setup.body"), COLORS.gold)
             primary_button(
-                self,
-                self.t("nav.settings"),
-                GOLD_ACCENT,
-                self.window.show_settings,
+                self, self.t("nav.settings"), GOLD_ACCENT, self.window.show_settings
             ).pack(fill="x", pady=(14, 0))
         else:
             self._role_cards()
@@ -35,84 +36,152 @@ class HomeView(View):
         self._footer()
 
     # ------------------------------------------------------------------
+    def _header(self) -> None:
+        bar = ctk.CTkFrame(self, fg_color="transparent")
+        bar.pack(fill="x")
+
+        self._logo_image(bar)
+
+        titles = ctk.CTkFrame(bar, fg_color="transparent")
+        titles.pack(side="left", fill="x", expand=True, padx=(14, 0))
+        ctk.CTkLabel(
+            titles, text="NowerTransfer", font=display(25), text_color=COLORS.text
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            titles, text=self.t("app.tagline"), font=font(12), text_color=COLORS.muted
+        ).pack(anchor="w", pady=(2, 0))
+
+        self.language_switch(bar).pack(side="right")
+
+    def _logo_image(self, parent: ctk.CTkBaseClass) -> None:
+        """The mark, when it is there. Never a reason to fail.
+
+        A ready-sized PNG through tkinter's own loader: CTkImage would
+        need Pillow, which nothing else here does.
+        """
+        path = asset("logo-40.png")
+        if path is None:
+            return
+        with suppress(tkinter.TclError):
+            # Held on the widget: tkinter does not own the image.
+            self._logo = tkinter.PhotoImage(file=str(path))
+            ctk.CTkLabel(parent, image=self._logo, text="").pack(side="left")
+
     def _role_cards(self) -> None:
         row = ctk.CTkFrame(self, fg_color="transparent")
-        row.pack(fill="both", expand=True, pady=6)
+        row.pack(fill="both", expand=True, pady=(26, 14))
         row.grid_columnconfigure((0, 1), weight=1, uniform="roles")
         row.grid_rowconfigure(0, weight=1)
 
-        # The arrow carries the direction; with one accent the colour
-        # cannot.
-        roles: list[tuple[str, str, str, object]] = [
-            ("▲", "home.send.title", "home.send.body", self.window.show_send),
-            ("▼", "home.receive.title", "home.receive.body", self.window.show_receive),
+        roles = [
+            ("▲", "home.send", self.window.show_send, True),
+            ("▼", "home.receive", self.window.show_receive, False),
         ]
-        for column, (arrow, title, body, command) in enumerate(roles):
-            ctk.CTkButton(
+        for column, (glyph, key, command, filled) in enumerate(roles):
+            title, body = f"{key}.title", f"{key}.body"
+            card = ctk.CTkFrame(
                 row,
-                text=f"{arrow}\n\n{self.t(title)}\n\n{self.t(body)}",
-                font=font(16, bold=True),
                 fg_color=COLORS.panel,
-                hover_color=COLORS.panel_hover,
-                text_color=GOLD_ACCENT.color,
-                corner_radius=14,
-                border_width=2,
-                border_color=GOLD_ACCENT.color,
-                command=command,
-            ).grid(
+                corner_radius=RADIUS_LARGE,
+                border_width=1,
+                border_color=COLORS.gold if filled else COLORS.panel_active,
+            )
+            # "ew", not "nsew": the cards keep their natural height and
+            # the spare room centres them instead of stretching them.
+            card.grid(
                 row=0,
                 column=column,
-                sticky="nsew",
-                padx=(0, 8) if column == 0 else (8, 0),
-                pady=4,
+                sticky="ew",
+                padx=(0, 9) if column == 0 else (9, 0),
             )
+
+            badge = ctk.CTkLabel(
+                card,
+                text=glyph,
+                width=42,
+                height=42,
+                corner_radius=12,
+                fg_color=COLORS.gold if filled else COLORS.panel_hover,
+                text_color=COLORS.ink if filled else COLORS.gold,
+                font=font(15, bold=True),
+            )
+            badge.pack(anchor="w", padx=20, pady=(20, 0))
+            ctk.CTkLabel(
+                card, text=self.t(title), font=display(19), text_color=COLORS.text
+            ).pack(anchor="w", padx=20, pady=(14, 0))
+            ctk.CTkLabel(
+                card,
+                text=self.t(body),
+                font=font(12),
+                text_color=COLORS.muted,
+                justify="left",
+                anchor="w",
+            ).pack(anchor="w", padx=20, pady=(5, 20))
+
+            # tkinter has no button that can hold other widgets, so the
+            # whole card is made clickable instead - children included,
+            # or the badge and labels would swallow the click.
+            self._make_clickable(card, command)
+
+    def _make_clickable(self, widget: ctk.CTkBaseClass, command) -> None:
+        widget.bind("<Button-1>", lambda _event: command())
+        widget.configure(cursor="hand2")
+        for child in widget.winfo_children():
+            self._make_clickable(child, command)
 
     def _resume_link(self) -> None:
         session = load_send_session()
         if session is None:
             return
+        strip = ctk.CTkFrame(self, fg_color=COLORS.panel, corner_radius=RADIUS)
+        strip.pack(fill="x", pady=(GAP, 0))
+        ctk.CTkLabel(
+            strip,
+            text=self.t("home.resume_short"),
+            font=font(12),
+            text_color=COLORS.muted,
+        ).pack(side="left", padx=(16, 10), pady=11)
+        ctk.CTkLabel(
+            strip, text=session.code, font=mono(12), text_color=COLORS.gold
+        ).pack(side="left")
         link_button(
-            self,
-            self.t("home.resume", code=session.code),
+            strip,
+            self.t("home.resume_open"),
             lambda: self.window.show_send(resume=session),
-            width=320,
-        ).pack(pady=(10, 0))
+            width=90,
+        ).pack(side="right", padx=8)
 
     def _blocker(self, title: str, body: str, accent: str) -> None:
         card = Card(self, accent=accent)
-        card.pack(fill="x", pady=10)
+        card.pack(fill="x", pady=(24, 0))
         ctk.CTkLabel(
-            card,
-            text=title,
-            font=font(15, bold=True),
-            text_color=accent,
-            anchor="w",
-        ).pack(anchor="w", padx=16, pady=(16, 4))
-        ctk.CTkLabel(
-            card,
-            text=body,
-            font=font(12),
-            text_color=COLORS.muted,
-            wraplength=500,
-            justify="left",
-            anchor="w",
-        ).pack(anchor="w", padx=16, pady=(0, 16))
+            card, text=title, font=display(17), text_color=accent, anchor="w"
+        ).pack(anchor="w", padx=18, pady=(18, 4))
+        hint(card, body, width=520).pack(anchor="w", padx=18, pady=(0, 18))
 
     def _footer(self) -> None:
-        bar = ctk.CTkFrame(self, fg_color="transparent")
-        bar.pack(side="bottom", fill="x", pady=(10, 0))
-        link_button(bar, self.t("nav.settings"), self.window.show_settings).pack(
-            side="left"
-        )
         settings = self.window.settings
+        strip = ctk.CTkFrame(self, fg_color=COLORS.panel, corner_radius=RADIUS)
+        strip.pack(side="bottom", fill="x")
+
         relay = (
             self.t("relay.public")
             if settings.mode is RelayMode.PUBLIC
             else settings.relay.display_host()
         )
-        ctk.CTkLabel(
-            bar,
-            text=self.t("app.footer", version=__version__, relay=relay),
-            font=font(10),
-            text_color=COLORS.muted,
-        ).pack(side="right", pady=6)
+        status = StatusDot(strip, self.t("relay.label"), COLORS.gold)
+        status.pack(side="left", padx=(16, 0), pady=11)
+        ctk.CTkLabel(strip, text=relay, font=mono(12), text_color=COLORS.text).pack(
+            side="left", padx=(10, 0)
+        )
+        link_button(
+            strip, self.t("nav.settings"), self.window.show_settings, width=110
+        ).pack(side="right", padx=8)
+
+        version = ctk.CTkFrame(self, fg_color="transparent")
+        version.pack(side="bottom", fill="x", pady=(0, 8))
+        # "dev" and "unknown" are words, not numbers: no leading v.
+        shown = f"v{__version__}" if __version__[:1].isdigit() else __version__
+        ctk.CTkLabel(version, text=shown, font=font(10), text_color=COLORS.faint).pack(
+            side="left"
+        )

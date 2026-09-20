@@ -139,6 +139,73 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     # -- transfer status ----------------------------------------------
     "status.ready": {"en": "Ready.", "de": "Bereit."},
+    "stat.size": {"en": "Size", "de": "Größe"},
+    "stat.items": {"en": "Items", "de": "Einträge"},
+    "stat.elapsed": {"en": "Elapsed", "de": "Verstrichen"},
+    "stat.details": {"en": "Show details", "de": "Details anzeigen"},
+    "stat.unknown": {"en": "—", "de": "—"},
+    "relay.label": {"en": "Relay", "de": "Relay"},
+    "relay.checking": {"en": "Checking …", "de": "Wird geprüft …"},
+    "relay.reachable": {"en": "Relay reachable", "de": "Relay erreichbar"},
+    "relay.unreachable": {"en": "Relay not reachable", "de": "Relay nicht erreichbar"},
+    "relay.test": {"en": "Test connection", "de": "Verbindung testen"},
+    "home.resume_short": {"en": "Resume", "de": "Fortsetzen"},
+    "home.resume_open": {"en": "Open", "de": "Öffnen"},
+    "send.step": {"en": "Step 1 of 2", "de": "Schritt 1 von 2"},
+    "send.drop_here": {
+        "en": "Drag files or a folder here",
+        "de": "Dateien oder Ordner hierher ziehen",
+    },
+    "send.entropy": {"en": "{bits} bits of entropy", "de": "{bits} Bit Entropie"},
+    "send.recipient_needs": {
+        "en": "The recipient needs nothing but the code phrase.",
+        "de": "Der Empfänger braucht nur die Code-Phrase.",
+    },
+    "receive.code_help": {
+        "en": "Five words and two digits, separated by hyphens.",
+        "de": "Fünf Wörter und zwei Ziffern, mit Bindestrichen.",
+    },
+    "receive.target_label": {"en": "Destination", "de": "Zielordner"},
+    "receive.change": {"en": "Change", "de": "Ändern"},
+    "receive.sender_must_start": {
+        "en": "The sender has to have started the transfer.",
+        "de": "Der Absender muss die Übertragung gestartet haben.",
+    },
+    "status.running": {"en": "Running", "de": "Läuft"},
+    "status.cancel_safe": {
+        "en": "Cancelling is safe — the same code phrase resumes it.",
+        "de": "Abbrechen ist gefahrlos — mit derselben Code-Phrase geht es weiter.",
+    },
+    "done.title": {"en": "Everything arrived", "de": "Alles angekommen"},
+    "done.sent": {"en": "Everything sent", "de": "Alles verschickt"},
+    "done.close": {"en": "Done", "de": "Fertig"},
+    "setup.welcome": {
+        "en": (
+            "Enter your relay once and everything goes through it. You will "
+            "not have to think about it again."
+        ),
+        "de": (
+            "Trag einmal dein Relay ein, dann läuft alles darüber. Danach "
+            "musst du dich damit nie wieder befassen."
+        ),
+    },
+    "setup.start": {"en": "Let's go", "de": "Los geht's"},
+    "setup.use_public": {
+        "en": "No relay of your own? Use croc's public relay",
+        "de": "Kein eigenes Relay? Öffentliches croc-Relay nutzen",
+    },
+    "settings.port_added": {
+        "en": "Port 9009 is added when you leave it out.",
+        "de": "Port 9009 wird ergänzt, wenn du keinen angibst.",
+    },
+    "settings.password_note": {
+        "en": "optional · protects the relay, not the files",
+        "de": "optional · schützt das Relay, nicht die Dateien",
+    },
+    "settings.encrypted_note": {
+        "en": "The password is stored encrypted for your Windows account.",
+        "de": "Das Passwort wird verschlüsselt für dein Windows-Konto abgelegt.",
+    },
     "status.cancel": {"en": "Cancel", "de": "Abbrechen"},
     "status.cancelling": {"en": "Cancelling …", "de": "Wird abgebrochen …"},
     "status.cancelled": {

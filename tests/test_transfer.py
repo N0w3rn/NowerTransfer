@@ -14,6 +14,7 @@ from nowertransfer.transfer import (
     looks_like_config_error,
     looks_like_version_mismatch,
     looks_like_wrong_relay_password,
+    parse_incoming,
     parse_progress,
 )
 
@@ -96,6 +97,22 @@ def test_a_refused_password_is_reported_as_such():
 )
 def test_version_mismatch_detection(line, expected):
     assert looks_like_version_mismatch(line) is expected
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        # The only size the receiving side ever learns: croc reports no
+        # progress at all through a pipe.
+        ("Receiving 'holiday.zip' (4.2 GB)", ("holiday.zip", "4.2 GB")),
+        ("Sending 'a b c.txt' (12 kB)", ("a b c.txt", "12 kB")),
+        ("Receiving 'x' (0 B)", ("x", "0 B")),
+        ("Receiving (192.168.2.117<-127.0.0.1)", None),
+        ("connecting...", None),
+    ],
+)
+def test_parse_incoming(line, expected):
+    assert parse_incoming(line) == expected
 
 
 def test_the_public_web_receive_url_is_kept_out_of_the_ui():

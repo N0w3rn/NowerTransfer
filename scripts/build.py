@@ -37,7 +37,8 @@ SRC_DIR = PROJECT_ROOT / "src"
 VENDOR_DIR = PROJECT_ROOT / "vendor"
 DIST_DIR = PROJECT_ROOT / "dist"
 WORK_DIR = PROJECT_ROOT / "build"
-ICON_PATH = PROJECT_ROOT / "assets" / "icon.ico"
+ASSETS_DIR = PROJECT_ROOT / "assets"
+ICON_PATH = ASSETS_DIR / "icon.ico"
 ENV_FILE = PROJECT_ROOT / ".env"
 
 APP_NAME = "NowerTransfer"
@@ -166,7 +167,13 @@ def pyinstaller_command(
         # --icon sets the .exe's own icon; the running window loads the
         # bundled copy itself, so it has to be packed in as well.
         command += ["--icon", str(ICON_PATH)]
-        command += ["--add-data", f"{ICON_PATH}{separator}."]
+
+    # Everything the UI loads at runtime: the window icon and the logo
+    # the start screen draws.
+    for name in ("icon.ico", "logo-40.png", "logo-88.png"):
+        asset = ASSETS_DIR / name
+        if asset.exists():
+            command += ["--add-data", f"{asset}{separator}."]
     command.append(str(PROJECT_ROOT / "scripts" / "entrypoint.py"))
     return command
 

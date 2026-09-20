@@ -57,8 +57,8 @@ class MainWindow(ctk.CTk):
         self._view_options: dict[str, object] = {}
 
         self.title(APP_NAME)
-        self.geometry("640x580")
-        self.minsize(580, 540)
+        self.geometry("720x620")
+        self.minsize(690, 600)
         self.configure(fg_color=COLORS.background)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self._apply_icon()

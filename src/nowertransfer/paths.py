@@ -66,7 +66,12 @@ ICON_NAME = "icon.ico"
 
 def icon_path() -> Path | None:
     """The window icon, bundled into a build or read from ``assets/``."""
-    for candidate in (bundle_dir() / ICON_NAME, project_root() / "assets" / ICON_NAME):
+    return asset("icon.ico")
+
+
+def asset(name: str) -> Path | None:
+    """A file shipped with the app, from the bundle or from ``assets/``."""
+    for candidate in (bundle_dir() / name, project_root() / "assets" / name):
         if candidate.is_file():
             return candidate
     return None
